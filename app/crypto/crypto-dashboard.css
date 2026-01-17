@@ -197,6 +197,7 @@
   margin-bottom: 2rem;
   box-shadow: var(--shadow-lg);
   border: 1px solid var(--border-color);
+  scroll-margin-top: 100px; /* Account for sticky header when scrolling */
 }
 
 .chart-header {

@@ -42,6 +42,16 @@ export async function GET(request) {
     });
 
     if (!response.ok) {
+      // If rate limited (429) and we have cached data, return it
+      if (response.status === 429 && cached) {
+        console.log('Rate limited, returning stale cache for', id);
+        return NextResponse.json({
+          data: cached.data,
+          cached: true,
+          stale: true,
+          timestamp: cached.timestamp,
+        });
+      }
       throw new Error(`CoinGecko API error: ${response.status}`);
     }
 
@@ -60,6 +70,16 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error('Error fetching coin history:', error);
+    // Return cached data if available on any error
+    const cachedData = historyCache.get(cacheKey);
+    if (cachedData) {
+      return NextResponse.json({
+        data: cachedData.data,
+        cached: true,
+        stale: true,
+        timestamp: cachedData.timestamp,
+      });
+    }
     return NextResponse.json(
       { error: 'Failed to fetch coin history', message: error.message },
       { status: 500 }

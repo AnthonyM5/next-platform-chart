@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCryptoStore } from '../store/cryptoStore';
 import CryptoTable from './CryptoTable';
 import CryptoChart from './CryptoChart';
@@ -21,6 +21,7 @@ export default function CryptoDashboard() {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const chartSectionRef = useRef(null);
 
   // Initialize from storage on mount
   useEffect(() => {
@@ -136,6 +137,10 @@ export default function CryptoDashboard() {
       setChartData(null);
     } else {
       fetchChartData(coinId);
+      // Scroll to chart after a short delay to allow render
+      setTimeout(() => {
+        chartSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     }
   };
 
@@ -193,7 +198,7 @@ export default function CryptoDashboard() {
 
           {/* Chart Section */}
           {selectedCoin && (
-            <section className="chart-section">
+            <section className="chart-section" ref={chartSectionRef}>
               <div className="chart-header">
                 <div className="chart-title-area">
                   {selectedCoinData && (

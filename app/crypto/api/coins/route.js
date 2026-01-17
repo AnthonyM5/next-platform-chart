@@ -42,6 +42,16 @@ export async function GET(request) {
     });
 
     if (!response.ok) {
+      // If rate limited (429) and we have cached data, return it
+      if (response.status === 429 && cache.data) {
+        console.log('Rate limited, returning stale cache');
+        return NextResponse.json({
+          data: cache.data,
+          cached: true,
+          stale: true,
+          timestamp: cache.timestamp,
+        });
+      }
       throw new Error(`CoinGecko API error: ${response.status}`);
     }
 
@@ -61,6 +71,15 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error('Error fetching cryptocurrency data:', error);
+    // Return cached data if available on any error
+    if (cache.data) {
+      return NextResponse.json({
+        data: cache.data,
+        cached: true,
+        stale: true,
+        timestamp: cache.timestamp,
+      });
+    }
     return NextResponse.json(
       { error: 'Failed to fetch cryptocurrency data', message: error.message },
       { status: 500 }
