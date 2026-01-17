@@ -13,11 +13,15 @@
     "@netlify/blobs": "^10.5.0",
     "blobshape": "^1.0.0",
     "bright": "^1.0.0",
+    "chart.js": "^4.4.1",
+    "date-fns": "^3.0.6",
     "markdown-to-jsx": "^7.7.16",
     "next": "^16.0.8",
     "react": "19.2.3",
+    "react-chartjs-2": "^5.2.0",
     "react-dom": "19.2.3",
-    "unique-names-generator": "^4.7.1"
+    "unique-names-generator": "^4.7.1",
+    "zustand": "^4.4.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.15",
