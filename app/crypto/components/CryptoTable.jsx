@@ -7,11 +7,17 @@ export default function CryptoTable({ coins, loading, onSelectCoin }) {
   const { favorites, addFavorite, removeFavorite, theme, viewMode } = useCryptoStore();
   const [sortConfig, setSortConfig] = useState({ key: 'market_cap_rank', direction: 'asc' });
   const [searchQuery, setSearchQuery] = useState('');
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   const filteredCoins = useMemo(() => {
     if (!coins) return [];
     
     let filtered = coins;
+
+    // Apply favorites filter
+    if (showFavoritesOnly) {
+      filtered = filtered.filter(coin => favorites.includes(coin.id));
+    }
     
     // Apply search filter
     if (searchQuery) {
@@ -38,7 +44,7 @@ export default function CryptoTable({ coins, loading, onSelectCoin }) {
     });
 
     return filtered;
-  }, [coins, sortConfig, searchQuery]);
+  }, [coins, sortConfig, searchQuery, showFavoritesOnly, favorites]);
 
   const handleSort = (key) => {
     setSortConfig(prev => ({
@@ -92,7 +98,21 @@ export default function CryptoTable({ coins, loading, onSelectCoin }) {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
           />
+          <button
+            onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+            className={`favorites-toggle ${showFavoritesOnly ? 'active' : ''}`}
+            title={showFavoritesOnly ? 'Show all coins' : 'Show favorites only'}
+          >
+            {showFavoritesOnly ? '★' : '☆'} Favorites
+          </button>
         </div>
+        {showFavoritesOnly && filteredCoins.length === 0 ? (
+          <div className="no-favorites-message">
+            <span className="star-icon">☆</span>
+            <p>No favorites yet!</p>
+            <p className="hint">Click the star icon on any coin to add it to your favorites.</p>
+          </div>
+        ) : (
         <div className="grid-container">
           {filteredCoins.map((coin) => (
             <div
@@ -133,6 +153,7 @@ export default function CryptoTable({ coins, loading, onSelectCoin }) {
             </div>
           ))}
         </div>
+        )}
       </div>
     );
   }
@@ -147,7 +168,21 @@ export default function CryptoTable({ coins, loading, onSelectCoin }) {
           onChange={(e) => setSearchQuery(e.target.value)}
           className="search-input"
         />
+        <button
+          onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+          className={`favorites-toggle ${showFavoritesOnly ? 'active' : ''}`}
+          title={showFavoritesOnly ? 'Show all coins' : 'Show favorites only'}
+        >
+          {showFavoritesOnly ? '★' : '☆'} Favorites
+        </button>
       </div>
+      {showFavoritesOnly && filteredCoins.length === 0 ? (
+        <div className="no-favorites-message">
+          <span className="star-icon">☆</span>
+          <p>No favorites yet!</p>
+          <p className="hint">Click the star icon on any coin to add it to your favorites.</p>
+        </div>
+      ) : (
       <div className="table-wrapper">
         <table className="crypto-table">
           <thead>
@@ -209,6 +244,7 @@ export default function CryptoTable({ coins, loading, onSelectCoin }) {
                     <div className="coin-details">
                       <span className="coin-name-text">{coin.name}</span>
                       <span className="coin-symbol-text">{coin.symbol.toUpperCase()}</span>
+                      <span className="coin-price-mobile">${formatNumber(coin.current_price)}</span>
                     </div>
                   </div>
                 </td>
@@ -236,6 +272,7 @@ export default function CryptoTable({ coins, loading, onSelectCoin }) {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }

@@ -529,11 +529,14 @@
 
 /* Search Bar */
 .search-bar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
   margin-bottom: 1.5rem;
 }
 
 .search-input {
-  width: 100%;
+  flex: 1;
   padding: 0.75rem 1rem;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -547,6 +550,65 @@
   outline: none;
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+/* Favorites Toggle */
+.favorites-toggle {
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.favorites-toggle:hover {
+  border-color: #fbbf24;
+  color: #fbbf24;
+}
+
+.favorites-toggle.active {
+  background: #fbbf24;
+  border-color: #fbbf24;
+  color: #1f2937;
+}
+
+/* No Favorites Message */
+.no-favorites-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.no-favorites-message .star-icon {
+  font-size: 3rem;
+  color: #fbbf24;
+  margin-bottom: 1rem;
+}
+
+.no-favorites-message p {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.no-favorites-message .hint {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+  font-weight: 400;
 }
 
 /* Crypto Table */
@@ -635,6 +697,15 @@
   font-size: 0.75rem;
   color: var(--text-secondary);
   text-transform: uppercase;
+}
+
+/* Mobile price display - hidden by default, shown on small screens */
+.coin-price-mobile {
+  display: none;
+  font-size: 0.813rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 0.125rem;
 }
 
 .favorite-button-small {
@@ -936,6 +1007,10 @@
     border-radius: 0.75rem;
   }
 
+  .chart-section {
+    scroll-margin-top: 80px;
+  }
+
   .grid-container {
     grid-template-columns: 1fr;
   }
@@ -1023,6 +1098,10 @@
 @media (max-width: 640px) {
   .dashboard-header {
     padding: 0.75rem 1rem;
+  }
+
+  .chart-section {
+    scroll-margin-top: 140px;
   }
 
   .header-left {
@@ -1121,7 +1200,17 @@
 
   .search-input {
     font-size: 0.875rem;
-    padding: 0.625rem 0.75rem 0.625rem 2.25rem;
+    padding: 0.625rem 0.75rem;
+  }
+
+  /* Favorites toggle on mobile */
+  .search-bar {
+    flex-wrap: wrap;
+  }
+
+  .favorites-toggle {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.813rem;
   }
 
   /* Compact badges on very small screens */
@@ -1139,6 +1228,11 @@
   .crypto-table th:nth-child(4),
   .crypto-table td:nth-child(4) {
     display: none;
+  }
+
+  /* Show price in coin name cell on mobile */
+  .coin-price-mobile {
+    display: block;
   }
 }
 

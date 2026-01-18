@@ -212,10 +212,6 @@ export default function CryptoDashboard() {
                         <h2 className="selected-coin-name">{selectedCoinData.name}</h2>
                         <div className="selected-coin-price">
                           <span className="price">${selectedCoinData.current_price.toLocaleString()}</span>
-                          <span className={`change ${selectedCoinData.price_change_percentage_24h >= 0 ? 'positive' : 'negative'}`}>
-                            {selectedCoinData.price_change_percentage_24h >= 0 ? '▲' : '▼'} 
-                            {Math.abs(selectedCoinData.price_change_percentage_24h).toFixed(2)}%
-                          </span>
                         </div>
                       </div>
                     </div>
