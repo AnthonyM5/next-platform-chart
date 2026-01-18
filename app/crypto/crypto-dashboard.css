@@ -351,6 +351,33 @@
   color: var(--accent-primary);
 }
 
+/* RSI Badge as Link */
+a.rsi-badge {
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+a.rsi-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+/* Info Icon */
+.info-icon {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-left: 0.25rem;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+a.rsi-badge:hover .info-icon,
+.indicator-label-link:hover .info-icon {
+  opacity: 1;
+  color: var(--accent-primary);
+}
+
 /* Price Chart Container */
 .price-chart-container {
   height: 300px;
@@ -376,6 +403,25 @@
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+/* RSI Indicator Label Link */
+.indicator-label-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.indicator-label-link:hover {
+  color: var(--accent-primary);
+}
+
+.indicator-label-link:hover .indicator-label {
+  color: var(--accent-primary);
 }
 
 .rsi-levels {

@@ -92,15 +92,69 @@ function calculatePeriodChange(prices) {
   return ((lastPrice - firstPrice) / firstPrice) * 100;
 }
 
+/**
+ * RSI (Relative Strength Index) Configuration
+ * 
+ * Based on J. Welles Wilder Jr.'s original work and modern trading practices:
+ * - Standard period: 14 (balanced response, suitable for swing trading)
+ * - Shorter periods (5-9): More sensitive, captures quick momentum shifts, more noise
+ * - Longer periods (21-30): Smoother signals, better for identifying major trends
+ * 
+ * Overbought/Oversold Levels:
+ * - Above 70: Overbought - potential selling opportunity or strong bullish momentum
+ * - Below 30: Oversold - potential buying opportunity or strong bearish momentum
+ * - 50 is neutral (bullish momentum above, bearish below)
+ * 
+ * Source: Investopedia - https://www.investopedia.com/terms/r/rsi.asp
+ */
+const RSI_CONFIG = {
+  '1': {
+    period: 9,
+    description: 'RSI(9) - Shorter period for intraday analysis. More responsive to price changes, ideal for capturing quick momentum shifts in 24-hour data.',
+    rationale: 'With hourly data points over 24 hours, a 9-period RSI provides sensitivity to short-term momentum while reducing noise compared to even shorter periods.'
+  },
+  '7': {
+    period: 14,
+    description: 'RSI(14) - Standard period recommended by J. Welles Wilder. Balanced response suitable for weekly swing trading analysis.',
+    rationale: 'The default 14-period setting provides a good balance between sensitivity and reliability for week-long price movements.'
+  },
+  '30': {
+    period: 14,
+    description: 'RSI(14) - Standard period for monthly analysis. Captures medium-term momentum trends effectively.',
+    rationale: 'For 30-day analysis, the standard 14-period RSI remains effective as it balances responsiveness with signal reliability.'
+  },
+  '365': {
+    period: 21,
+    description: 'RSI(21) - Extended period for long-term trend analysis. Smoother signals that filter out short-term noise.',
+    rationale: 'Longer periods reduce false signals and better identify major trend reversals in yearly data, as recommended for long-term investors.'
+  },
+  default: {
+    period: 14,
+    description: 'RSI(14) - Standard Relative Strength Index period.',
+    rationale: 'The industry-standard 14-period RSI as originally designed by J. Welles Wilder Jr.'
+  }
+};
+
+// RSI educational info for tooltips
+const RSI_INFO = {
+  title: 'Relative Strength Index (RSI)',
+  description: 'A momentum oscillator measuring the speed and magnitude of price changes to identify overbought or oversold conditions.',
+  levels: {
+    overbought: 'RSI > 70: Asset may be overbought. In uptrends, this can indicate strong momentum rather than an immediate reversal.',
+    oversold: 'RSI < 30: Asset may be oversold. In downtrends, prices can remain oversold for extended periods.',
+    neutral: 'RSI = 50: Neutral point. Above 50 suggests bullish momentum, below 50 suggests bearish momentum.'
+  },
+  source: 'https://www.investopedia.com/terms/r/rsi.asp'
+};
+
 // Get RSI period based on time selection
 function getRSIPeriod(timePeriod) {
-  switch (timePeriod) {
-    case '1': return 14; // 14 periods for 1 day (hourly data)
-    case '7': return 14; // 14 periods for 7 days
-    case '30': return 14; // 14 periods for 30 days
-    case '365': return 14; // 14 periods for 1 year
-    default: return 14;
-  }
+  return RSI_CONFIG[timePeriod]?.period || RSI_CONFIG.default.period;
+}
+
+// Get RSI description for current time period
+function getRSIDescription(timePeriod) {
+  return RSI_CONFIG[timePeriod]?.description || RSI_CONFIG.default.description;
 }
 
 // Get time period label
@@ -119,9 +173,9 @@ export default function CryptoChart({ coinData, loading }) {
   const isDark = theme === 'dark';
 
   // Calculate RSI and period change
-  const { rsiData, periodChange, prices, labels } = useMemo(() => {
+  const { rsiData, periodChange, prices, labels, rsiPeriod } = useMemo(() => {
     if (!coinData || !coinData.prices || coinData.prices.length === 0) {
-      return { rsiData: [], periodChange: null, prices: [], labels: [] };
+      return { rsiData: [], periodChange: null, prices: [], labels: [], rsiPeriod: 14 };
     }
 
     const priceValues = coinData.prices.map(([_, price]) => price);
@@ -144,8 +198,13 @@ export default function CryptoChart({ coinData, loading }) {
       periodChange: change,
       prices: priceValues,
       labels: formattedLabels,
+      rsiPeriod,
+      rsiDescription: getRSIDescription(timePeriod),
     };
   }, [coinData, timePeriod]);
+
+  // Get RSI info link
+  const rsiInfoUrl = RSI_INFO.source;
 
   if (loading) {
     return (
@@ -291,7 +350,7 @@ export default function CryptoChart({ coinData, loading }) {
         displayColors: false,
         callbacks: {
           label: function(context) {
-            return `RSI: ${context.parsed.y?.toFixed(2) || 'N/A'}`;
+            return `RSI(${rsiPeriod}): ${context.parsed.y?.toFixed(2) || 'N/A'}`;
           },
         },
       },
@@ -327,6 +386,9 @@ export default function CryptoChart({ coinData, loading }) {
   // Get current RSI value
   const currentRSI = rsiData.filter(v => v !== null).pop();
   const rsiStatus = currentRSI > 70 ? 'overbought' : currentRSI < 30 ? 'oversold' : 'neutral';
+  const { rsiDescription } = useMemo(() => ({
+    rsiDescription: getRSIDescription(timePeriod)
+  }), [timePeriod]);
 
   return (
     <div className="crypto-chart">
@@ -339,11 +401,18 @@ export default function CryptoChart({ coinData, loading }) {
           </span>
         </div>
         {currentRSI && (
-          <div className={`rsi-badge ${rsiStatus}`}>
-            <span className="rsi-label">RSI(14):</span>
+          <a 
+            href={rsiInfoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`rsi-badge ${rsiStatus}`}
+            title={rsiDescription}
+          >
+            <span className="rsi-label">RSI({rsiPeriod}):</span>
             <span className="rsi-value">{currentRSI.toFixed(1)}</span>
             <span className="rsi-status">({rsiStatus})</span>
-          </div>
+            <span className="info-icon">ⓘ</span>
+          </a>
         )}
       </div>
 
@@ -355,10 +424,19 @@ export default function CryptoChart({ coinData, loading }) {
       {/* RSI Chart */}
       <div className="rsi-chart-container">
         <div className="rsi-chart-header">
-          <span className="indicator-label">RSI (14)</span>
+          <a 
+            href={rsiInfoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="indicator-label-link"
+            title={rsiDescription}
+          >
+            <span className="indicator-label">RSI ({rsiPeriod})</span>
+            <span className="info-icon">ⓘ</span>
+          </a>
           <div className="rsi-levels">
-            <span className="level overbought">70 - Overbought</span>
-            <span className="level oversold">30 - Oversold</span>
+            <span className="level overbought" title={RSI_INFO.levels.overbought}>70 - Overbought</span>
+            <span className="level oversold" title={RSI_INFO.levels.oversold}>30 - Oversold</span>
           </div>
         </div>
         <div className="rsi-chart-wrapper">
