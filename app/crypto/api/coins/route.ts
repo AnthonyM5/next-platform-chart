@@ -1,13 +1,21 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import type { Coin, ApiResponse } from '../../types';
 
 // Cache configuration
 const CACHE_DURATION = 30000; // 30 seconds
-let cache = {
+
+interface CacheEntry {
+  data: Coin[] | null;
+  timestamp: number | null;
+  key?: string;
+}
+
+let cache: CacheEntry = {
   data: null,
   timestamp: null,
 };
 
-export async function GET(request) {
+export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse<Coin[]> | { error: string; message: string }>> {
   try {
     const { searchParams } = new URL(request.url);
     const ids = searchParams.get('ids');
@@ -49,13 +57,13 @@ export async function GET(request) {
           data: cache.data,
           cached: true,
           stale: true,
-          timestamp: cache.timestamp,
+          timestamp: cache.timestamp!,
         });
       }
       throw new Error(`CoinGecko API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data: Coin[] = await response.json();
 
     // Update cache
     cache = {
@@ -77,11 +85,11 @@ export async function GET(request) {
         data: cache.data,
         cached: true,
         stale: true,
-        timestamp: cache.timestamp,
+        timestamp: cache.timestamp!,
       });
     }
     return NextResponse.json(
-      { error: 'Failed to fetch cryptocurrency data', message: error.message },
+      { error: 'Failed to fetch cryptocurrency data', message: (error as Error).message },
       { status: 500 }
     );
   }

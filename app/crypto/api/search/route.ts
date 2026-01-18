@@ -1,14 +1,20 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import type { CoinSearchResult, ApiResponse } from '../../types';
 
 // Cache for search results
-let searchCache = {
+interface SearchCache {
+  data: CoinSearchResult[] | null;
+  timestamp: number | null;
+}
+
+let searchCache: SearchCache = {
   data: null,
   timestamp: null,
 };
 
 const CACHE_DURATION = 3600000; // 1 hour for search list
 
-export async function GET(request) {
+export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse<CoinSearchResult[]> | { error: string; message: string }>> {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');
@@ -34,7 +40,7 @@ export async function GET(request) {
     }
 
     // Filter results if query provided
-    let results = searchCache.data;
+    let results = searchCache.data!;
     if (query && query.length > 0) {
       const lowerQuery = query.toLowerCase();
       results = results.filter(coin => 
@@ -49,12 +55,12 @@ export async function GET(request) {
     return NextResponse.json({
       data: results,
       cached: true,
-      timestamp: searchCache.timestamp,
+      timestamp: searchCache.timestamp!,
     });
   } catch (error) {
     console.error('Error searching cryptocurrencies:', error);
     return NextResponse.json(
-      { error: 'Failed to search cryptocurrencies', message: error.message },
+      { error: 'Failed to search cryptocurrencies', message: (error as Error).message },
       { status: 500 }
     );
   }

@@ -1,13 +1,56 @@
 'use client';
 
 import { create } from 'zustand';
+import type { Theme, TimePeriod, Currency, ViewMode, Notification, PriceAlerts } from '../types';
+
+interface CryptoState {
+  // Theme
+  theme: Theme;
+  toggleTheme: () => void;
+
+  // Favorites
+  favorites: string[];
+  addFavorite: (coinId: string) => void;
+  removeFavorite: (coinId: string) => void;
+  isFavorite: (coinId: string) => boolean;
+
+  // Selected coins for comparison
+  selectedCoins: string[];
+  addSelectedCoin: (coinId: string) => void;
+  removeSelectedCoin: (coinId: string) => void;
+
+  // Time period
+  timePeriod: TimePeriod;
+  setTimePeriod: (period: TimePeriod) => void;
+
+  // Currency
+  currency: Currency;
+  setCurrency: (currency: Currency) => void;
+
+  // View mode
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
+
+  // Notifications
+  notifications: Notification[];
+  addNotification: (notification: Omit<Notification, 'id'>) => void;
+  removeNotification: (id: number) => void;
+
+  // Price alerts
+  priceAlerts: PriceAlerts;
+  setPriceAlert: (coinId: string, threshold: number) => void;
+  removePriceAlert: (coinId: string) => void;
+
+  // Initialize from localStorage
+  initFromStorage: () => void;
+}
 
 // Create store without persist middleware initially to avoid SSR issues
-export const useCryptoStore = create((set, get) => ({
+export const useCryptoStore = create<CryptoState>((set, get) => ({
   // Theme
   theme: 'dark',
   toggleTheme: () => set((state) => {
-    const newTheme = state.theme === 'dark' ? 'light' : 'dark';
+    const newTheme: Theme = state.theme === 'dark' ? 'light' : 'dark';
     if (typeof window !== 'undefined') {
       localStorage.setItem('crypto-theme', newTheme);
     }
@@ -16,32 +59,32 @@ export const useCryptoStore = create((set, get) => ({
 
   // Favorites
   favorites: [],
-  addFavorite: (coinId) => set((state) => {
+  addFavorite: (coinId: string) => set((state) => {
     const newFavorites = [...new Set([...state.favorites, coinId])];
     if (typeof window !== 'undefined') {
       localStorage.setItem('crypto-favorites', JSON.stringify(newFavorites));
     }
     return { favorites: newFavorites };
   }),
-  removeFavorite: (coinId) => set((state) => {
+  removeFavorite: (coinId: string) => set((state) => {
     const newFavorites = state.favorites.filter(id => id !== coinId);
     if (typeof window !== 'undefined') {
       localStorage.setItem('crypto-favorites', JSON.stringify(newFavorites));
     }
     return { favorites: newFavorites };
   }),
-  isFavorite: (coinId) => get().favorites.includes(coinId),
+  isFavorite: (coinId: string) => get().favorites.includes(coinId),
 
   // Selected coins for comparison
   selectedCoins: ['bitcoin', 'ethereum'],
-  addSelectedCoin: (coinId) => set((state) => {
+  addSelectedCoin: (coinId: string) => set((state) => {
     const newSelected = [...new Set([...state.selectedCoins, coinId])];
     if (typeof window !== 'undefined') {
       localStorage.setItem('crypto-selected', JSON.stringify(newSelected));
     }
     return { selectedCoins: newSelected };
   }),
-  removeSelectedCoin: (coinId) => set((state) => {
+  removeSelectedCoin: (coinId: string) => set((state) => {
     const newSelected = state.selectedCoins.filter(id => id !== coinId);
     if (typeof window !== 'undefined') {
       localStorage.setItem('crypto-selected', JSON.stringify(newSelected));
@@ -51,7 +94,7 @@ export const useCryptoStore = create((set, get) => ({
 
   // Time period
   timePeriod: '7',
-  setTimePeriod: (period) => set(() => {
+  setTimePeriod: (period: TimePeriod) => set(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('crypto-period', period);
     }
@@ -60,7 +103,7 @@ export const useCryptoStore = create((set, get) => ({
 
   // Currency
   currency: 'usd',
-  setCurrency: (curr) => set(() => {
+  setCurrency: (curr: Currency) => set(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('crypto-currency', curr);
     }
@@ -68,8 +111,8 @@ export const useCryptoStore = create((set, get) => ({
   }),
 
   // View mode
-  viewMode: 'table', // 'table' or 'grid'
-  setViewMode: (mode) => set(() => {
+  viewMode: 'table',
+  setViewMode: (mode: ViewMode) => set(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('crypto-viewmode', mode);
     }
@@ -78,23 +121,23 @@ export const useCryptoStore = create((set, get) => ({
 
   // Notifications
   notifications: [],
-  addNotification: (notification) => set((state) => ({
+  addNotification: (notification: Omit<Notification, 'id'>) => set((state) => ({
     notifications: [...state.notifications, { ...notification, id: Date.now() }]
   })),
-  removeNotification: (id) => set((state) => ({
+  removeNotification: (id: number) => set((state) => ({
     notifications: state.notifications.filter(n => n.id !== id)
   })),
 
   // Price alerts
   priceAlerts: {},
-  setPriceAlert: (coinId, threshold) => set((state) => {
+  setPriceAlert: (coinId: string, threshold: number) => set((state) => {
     const newAlerts = { ...state.priceAlerts, [coinId]: threshold };
     if (typeof window !== 'undefined') {
       localStorage.setItem('crypto-alerts', JSON.stringify(newAlerts));
     }
     return { priceAlerts: newAlerts };
   }),
-  removePriceAlert: (coinId) => set((state) => {
+  removePriceAlert: (coinId: string) => set((state) => {
     const alerts = { ...state.priceAlerts };
     delete alerts[coinId];
     if (typeof window !== 'undefined') {
@@ -106,13 +149,13 @@ export const useCryptoStore = create((set, get) => ({
   // Initialize from localStorage
   initFromStorage: () => {
     if (typeof window !== 'undefined') {
-      const theme = localStorage.getItem('crypto-theme') || 'dark';
-      const favorites = JSON.parse(localStorage.getItem('crypto-favorites') || '[]');
-      const selectedCoins = JSON.parse(localStorage.getItem('crypto-selected') || '["bitcoin","ethereum"]');
-      const timePeriod = localStorage.getItem('crypto-period') || '7';
-      const currency = localStorage.getItem('crypto-currency') || 'usd';
-      const viewMode = localStorage.getItem('crypto-viewmode') || 'table';
-      const priceAlerts = JSON.parse(localStorage.getItem('crypto-alerts') || '{}');
+      const theme = (localStorage.getItem('crypto-theme') as Theme) || 'dark';
+      const favorites: string[] = JSON.parse(localStorage.getItem('crypto-favorites') || '[]');
+      const selectedCoins: string[] = JSON.parse(localStorage.getItem('crypto-selected') || '["bitcoin","ethereum"]');
+      const timePeriod = (localStorage.getItem('crypto-period') as TimePeriod) || '7';
+      const currency = (localStorage.getItem('crypto-currency') as Currency) || 'usd';
+      const viewMode = (localStorage.getItem('crypto-viewmode') as ViewMode) || 'table';
+      const priceAlerts: PriceAlerts = JSON.parse(localStorage.getItem('crypto-alerts') || '{}');
 
       set({
         theme,

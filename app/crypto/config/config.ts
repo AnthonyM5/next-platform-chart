@@ -1,6 +1,30 @@
 // Environment configuration for Crypto Dashboard
 
-export const config = {
+interface CacheDuration {
+  coins: number;
+  history: number;
+  search: number;
+}
+
+interface Features {
+  enableNotifications: boolean;
+  enableExport: boolean;
+  enableFavorites: boolean;
+  enableComparison: boolean;
+}
+
+interface Config {
+  coinGeckoApiKey: string;
+  baseApiUrl: string;
+  cacheDuration: CacheDuration;
+  autoRefreshInterval: number;
+  defaultCurrency: string;
+  defaultPerPage: number;
+  defaultTimePeriod: string;
+  features: Features;
+}
+
+export const config: Config = {
   // API Configuration
   coinGeckoApiKey: process.env.NEXT_PUBLIC_COINGECKO_API_KEY || '',
   baseApiUrl: '/crypto/api',

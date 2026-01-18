@@ -1,6 +1,8 @@
 'use client';
 
-export default function LoadingSkeleton({ type = 'table' }) {
+import type { LoadingSkeletonProps } from '../types';
+
+export default function LoadingSkeleton({ type = 'table' }: LoadingSkeletonProps) {
   if (type === 'chart') {
     return (
       <div className="chart-skeleton animate-pulse">

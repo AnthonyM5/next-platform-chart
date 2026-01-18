@@ -1,10 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import type { ChartData, ApiResponse } from '../../types';
 
 // Cache for historical data
-const historyCache = new Map();
+const historyCache = new Map<string, { data: ChartData; timestamp: number }>();
 const CACHE_DURATION = 300000; // 5 minutes for historical data
 
-export async function GET(request) {
+export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse<ChartData> | { error: string; message?: string }>> {
+  let cacheKey = '';
+  
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -19,7 +22,7 @@ export async function GET(request) {
     }
 
     // Check cache
-    const cacheKey = `${id}_${days}_${vsCurrency}`;
+    cacheKey = `${id}_${days}_${vsCurrency}`;
     const now = Date.now();
     const cached = historyCache.get(cacheKey);
 
@@ -55,7 +58,7 @@ export async function GET(request) {
       throw new Error(`CoinGecko API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data: ChartData = await response.json();
 
     // Store in cache
     historyCache.set(cacheKey, {
@@ -81,7 +84,7 @@ export async function GET(request) {
       });
     }
     return NextResponse.json(
-      { error: 'Failed to fetch coin history', message: error.message },
+      { error: 'Failed to fetch coin history', message: (error as Error).message },
       { status: 500 }
     );
   }

@@ -1,8 +1,14 @@
 'use client';
 
 import { useCryptoStore } from '../store/cryptoStore';
+import type { TimePeriod } from '../types';
 
-const TIME_PERIODS = [
+interface TimePeriodOption {
+  value: TimePeriod;
+  label: string;
+}
+
+const TIME_PERIODS: TimePeriodOption[] = [
   { value: '1', label: '1D' },
   { value: '7', label: '7D' },
   { value: '30', label: '30D' },

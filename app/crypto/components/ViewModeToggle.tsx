@@ -1,14 +1,19 @@
 'use client';
 
 import { useCryptoStore } from '../store/cryptoStore';
+import type { ViewMode } from '../types';
 
 export default function ViewModeToggle() {
   const { viewMode, setViewMode } = useCryptoStore();
 
+  const handleSetViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+  };
+
   return (
     <div className="view-mode-toggle">
       <button
-        onClick={() => setViewMode('table')}
+        onClick={() => handleSetViewMode('table')}
         className={`mode-button ${viewMode === 'table' ? 'active' : ''}`}
         aria-label="Table view"
       >
@@ -17,7 +22,7 @@ export default function ViewModeToggle() {
         </svg>
       </button>
       <button
-        onClick={() => setViewMode('grid')}
+        onClick={() => handleSetViewMode('grid')}
         className={`mode-button ${viewMode === 'grid' ? 'active' : ''}`}
         aria-label="Grid view"
       >
