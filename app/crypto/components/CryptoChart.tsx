@@ -1,28 +1,42 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Line } from 'react-chartjs-2';
+import { Line, Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
   Filler,
   ChartOptions,
+  ChartData as ChartJSData,
 } from 'chart.js';
 import { format } from 'date-fns';
 import { useCryptoStore } from '../store/cryptoStore';
-import type { ChartData, CryptoChartProps, RSIConfigMap, IndicatorInfo, TimePeriod } from '../types';
+import {
+  calculateSMA,
+  calculateMACD,
+  calculateBollingerBands,
+  getSMAConfig,
+  getMACDConfig,
+  getBollingerConfig,
+  SMA_INFO,
+  MACD_INFO,
+  BOLLINGER_INFO,
+} from '../utils/indicators';
+import type { ChartData, CryptoChartProps, RSIConfigMap, IndicatorInfo, TimePeriod, MACDData, BollingerBandsData } from '../types';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
@@ -172,14 +186,54 @@ function getTimePeriodLabel(timePeriod: TimePeriod): string {
 
 type RSIStatus = 'overbought' | 'oversold' | 'neutral';
 
+// Color constants for indicators
+const COLORS = {
+  smaShort: { light: '#f59e0b', dark: '#fbbf24' },
+  smaLong: { light: '#8b5cf6', dark: '#a78bfa' },
+  bollingerBand: { light: 'rgba(34, 197, 94, 0.15)', dark: 'rgba(52, 211, 153, 0.15)' },
+  bollingerMiddle: { light: '#22c55e', dark: '#34d399' },
+  macdLine: { light: '#06b6d4', dark: '#22d3ee' },
+  macdSignal: { light: '#ec4899', dark: '#f472b6' },
+  macdHistogramPos: { light: '#10b981', dark: '#34d399' },
+  macdHistogramNeg: { light: '#ef4444', dark: '#f87171' },
+};
+
 export default function CryptoChart({ coinData, loading }: CryptoChartProps) {
-  const { theme, timePeriod } = useCryptoStore();
+  const { theme, timePeriod, enabledStudies } = useCryptoStore();
   const isDark = theme === 'dark';
 
-  // Calculate RSI and period change
-  const { rsiData, periodChange, prices, labels, rsiPeriod, rsiDescription } = useMemo(() => {
+  // Calculate all indicators
+  const {
+    rsiData,
+    periodChange,
+    prices,
+    labels,
+    rsiPeriod,
+    rsiDescription,
+    smaShort,
+    smaLong,
+    smaConfig,
+    bollingerBands,
+    bollingerConfig,
+    macdData,
+    macdConfig,
+  } = useMemo(() => {
     if (!coinData || !coinData.prices || coinData.prices.length === 0) {
-      return { rsiData: [], periodChange: null, prices: [], labels: [], rsiPeriod: 14, rsiDescription: '' };
+      return {
+        rsiData: [],
+        periodChange: null,
+        prices: [],
+        labels: [],
+        rsiPeriod: 14,
+        rsiDescription: '',
+        smaShort: [],
+        smaLong: [],
+        smaConfig: getSMAConfig(timePeriod),
+        bollingerBands: { upper: [], middle: [], lower: [] } as BollingerBandsData,
+        bollingerConfig: getBollingerConfig(timePeriod),
+        macdData: { macdLine: [], signalLine: [], histogram: [] } as MACDData,
+        macdConfig: getMACDConfig(timePeriod),
+      };
     }
 
     const priceValues = coinData.prices.map(([_, price]) => price);
@@ -197,6 +251,19 @@ export default function CryptoChart({ coinData, loading }: CryptoChartProps) {
       return format(date, 'MMM d');
     });
 
+    // SMA calculations
+    const smaConf = getSMAConfig(timePeriod);
+    const shortSMA = calculateSMA(priceValues, smaConf.shortPeriod);
+    const longSMA = calculateSMA(priceValues, smaConf.longPeriod);
+
+    // Bollinger Bands calculations
+    const bbConf = getBollingerConfig(timePeriod);
+    const bb = calculateBollingerBands(priceValues, bbConf.period, bbConf.stdDev);
+
+    // MACD calculations
+    const macdConf = getMACDConfig(timePeriod);
+    const macd = calculateMACD(priceValues, macdConf.fastPeriod, macdConf.slowPeriod, macdConf.signalPeriod);
+
     return {
       rsiData: rsi,
       periodChange: change,
@@ -204,6 +271,13 @@ export default function CryptoChart({ coinData, loading }: CryptoChartProps) {
       labels: formattedLabels,
       rsiPeriod: calculatedRsiPeriod,
       rsiDescription: getRSIDescription(timePeriod),
+      smaShort: shortSMA,
+      smaLong: longSMA,
+      smaConfig: smaConf,
+      bollingerBands: bb,
+      bollingerConfig: bbConf,
+      macdData: macd,
+      macdConfig: macdConf,
     };
   }, [coinData, timePeriod]);
 
@@ -228,29 +302,125 @@ export default function CryptoChart({ coinData, loading }: CryptoChartProps) {
     );
   }
 
+  // Build price chart datasets with proper typing
+  type ChartDataset = {
+    label: string;
+    data: (number | null)[];
+    borderColor: string;
+    backgroundColor: string;
+    fill: boolean | string;
+    tension: number;
+    pointRadius: number;
+    pointHoverRadius?: number;
+    pointHoverBackgroundColor?: string;
+    borderWidth: number;
+    order?: number;
+    borderDash?: number[];
+  };
+
   // Price chart data
-  const priceChartData = {
-    labels,
-    datasets: [
+  const priceDatasets: ChartDataset[] = [
+    {
+      label: 'Price',
+      data: prices,
+      borderColor: periodChange !== null && periodChange >= 0 
+        ? (isDark ? '#34d399' : '#10b981')
+        : (isDark ? '#f87171' : '#ef4444'),
+      backgroundColor: periodChange !== null && periodChange >= 0
+        ? (isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(16, 185, 129, 0.1)')
+        : (isDark ? 'rgba(248, 113, 113, 0.1)' : 'rgba(239, 68, 68, 0.1)'),
+      fill: true,
+      tension: 0.4,
+      pointRadius: 0,
+      pointHoverRadius: 6,
+      pointHoverBackgroundColor: periodChange !== null && periodChange >= 0 
+        ? (isDark ? '#34d399' : '#10b981')
+        : (isDark ? '#f87171' : '#ef4444'),
+      borderWidth: 2,
+      order: 1,
+    },
+  ];
+
+  // Add Bollinger Bands (before price so it appears behind)
+  if (enabledStudies.bollingerBands && bollingerBands.upper.length > 0) {
+    priceDatasets.unshift(
       {
-        label: 'Price',
-        data: prices,
-        borderColor: periodChange !== null && periodChange >= 0 
-          ? (isDark ? '#34d399' : '#10b981')
-          : (isDark ? '#f87171' : '#ef4444'),
-        backgroundColor: periodChange !== null && periodChange >= 0
-          ? (isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(16, 185, 129, 0.1)')
-          : (isDark ? 'rgba(248, 113, 113, 0.1)' : 'rgba(239, 68, 68, 0.1)'),
-        fill: true,
+        label: 'BB Upper',
+        data: bollingerBands.upper,
+        borderColor: isDark ? COLORS.bollingerMiddle.dark : COLORS.bollingerMiddle.light,
+        backgroundColor: isDark ? COLORS.bollingerBand.dark : COLORS.bollingerBand.light,
+        fill: '+1',
         tension: 0.4,
         pointRadius: 0,
-        pointHoverRadius: 6,
-        pointHoverBackgroundColor: periodChange !== null && periodChange >= 0 
-          ? (isDark ? '#34d399' : '#10b981')
-          : (isDark ? '#f87171' : '#ef4444'),
-        borderWidth: 2,
+        pointHoverRadius: 0,
+        pointHoverBackgroundColor: 'transparent',
+        borderWidth: 1,
+        borderDash: [5, 5],
       },
-    ],
+      {
+        label: 'BB Middle',
+        data: bollingerBands.middle,
+        borderColor: isDark ? COLORS.bollingerMiddle.dark : COLORS.bollingerMiddle.light,
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        pointHoverBackgroundColor: 'transparent',
+        borderWidth: 1.5,
+      },
+      {
+        label: 'BB Lower',
+        data: bollingerBands.lower,
+        borderColor: isDark ? COLORS.bollingerMiddle.dark : COLORS.bollingerMiddle.light,
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        pointHoverBackgroundColor: 'transparent',
+        borderWidth: 1,
+        borderDash: [5, 5],
+      }
+    );
+  }
+
+  // Add SMA lines (on top of price)
+  if (enabledStudies.sma) {
+    if (smaShort.length > 0) {
+      priceDatasets.push({
+        label: `SMA ${smaConfig.shortPeriod}`,
+        data: smaShort,
+        borderColor: isDark ? COLORS.smaShort.dark : COLORS.smaShort.light,
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        pointHoverBackgroundColor: 'transparent',
+        borderWidth: 2,
+      });
+    }
+    if (smaLong.length > 0) {
+      priceDatasets.push({
+        label: `SMA ${smaConfig.longPeriod}`,
+        data: smaLong,
+        borderColor: isDark ? COLORS.smaLong.dark : COLORS.smaLong.light,
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        pointHoverBackgroundColor: 'transparent',
+        borderWidth: 2,
+      });
+    }
+  }
+
+  // Create price chart data object
+  const priceChartData = {
+    labels,
+    datasets: priceDatasets,
   };
 
   // RSI chart data
@@ -270,6 +440,51 @@ export default function CryptoChart({ coinData, loading }: CryptoChartProps) {
     ],
   };
 
+  // MACD chart data
+  const macdChartData = {
+    labels,
+    datasets: [
+      {
+        label: 'MACD',
+        data: macdData.macdLine,
+        borderColor: isDark ? COLORS.macdLine.dark : COLORS.macdLine.light,
+        backgroundColor: 'transparent',
+        tension: 0.4,
+        pointRadius: 0,
+        borderWidth: 2,
+      },
+      {
+        label: 'Signal',
+        data: macdData.signalLine,
+        borderColor: isDark ? COLORS.macdSignal.dark : COLORS.macdSignal.light,
+        backgroundColor: 'transparent',
+        tension: 0.4,
+        pointRadius: 0,
+        borderWidth: 2,
+      },
+    ],
+  };
+
+  // MACD Histogram data
+  const histogramColors = macdData.histogram.map(val => 
+    val !== null && val >= 0 
+      ? (isDark ? COLORS.macdHistogramPos.dark : COLORS.macdHistogramPos.light)
+      : (isDark ? COLORS.macdHistogramNeg.dark : COLORS.macdHistogramNeg.light)
+  );
+
+  const macdHistogramData = {
+    labels,
+    datasets: [
+      {
+        label: 'Histogram',
+        data: macdData.histogram,
+        backgroundColor: histogramColors,
+        borderWidth: 0,
+        barPercentage: 0.8,
+      },
+    ],
+  };
+
   const priceOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
@@ -279,7 +494,16 @@ export default function CryptoChart({ coinData, loading }: CryptoChartProps) {
     },
     plugins: {
       legend: {
-        display: false,
+        display: enabledStudies.sma || enabledStudies.bollingerBands,
+        position: 'top',
+        align: 'end',
+        labels: {
+          boxWidth: 12,
+          padding: 8,
+          font: { size: 11 },
+          color: isDark ? '#9ca3af' : '#6b7280',
+          filter: (item) => !item.text?.includes('BB Upper') && !item.text?.includes('BB Lower'),
+        },
       },
       tooltip: {
         backgroundColor: isDark ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.9)',
@@ -288,12 +512,16 @@ export default function CryptoChart({ coinData, loading }: CryptoChartProps) {
         borderColor: isDark ? '#374151' : '#e5e7eb',
         borderWidth: 1,
         padding: 12,
-        displayColors: false,
+        displayColors: true,
         callbacks: {
           label: function(context) {
             const value = context.parsed.y;
-            if (value === null) return 'N/A';
-            return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            if (value === null) return '';
+            const label = context.dataset.label || '';
+            if (label === 'Price' || label.includes('BB') || label.includes('SMA')) {
+              return `${label}: $${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+            return `${label}: ${value.toFixed(2)}`;
           },
         },
       },
@@ -390,6 +618,71 @@ export default function CryptoChart({ coinData, loading }: CryptoChartProps) {
     },
   };
 
+  const macdOptions: ChartOptions<'line'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top',
+        align: 'end',
+        labels: {
+          boxWidth: 12,
+          padding: 8,
+          font: { size: 10 },
+          color: isDark ? '#9ca3af' : '#6b7280',
+        },
+      },
+      tooltip: {
+        backgroundColor: isDark ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+        titleColor: isDark ? '#fff' : '#000',
+        bodyColor: isDark ? '#fff' : '#000',
+        borderColor: isDark ? '#374151' : '#e5e7eb',
+        borderWidth: 1,
+        padding: 12,
+        displayColors: true,
+        callbacks: {
+          label: (context) => `${context.dataset.label}: ${context.parsed.y?.toFixed(4) || 'N/A'}`,
+        },
+      },
+    },
+    scales: {
+      x: { display: false },
+      y: {
+        display: true,
+        position: 'right',
+        grid: { color: isDark ? 'rgba(55, 65, 81, 0.5)' : 'rgba(229, 231, 235, 0.5)' },
+        ticks: {
+          color: isDark ? '#9ca3af' : '#6b7280',
+          font: { size: 11 },
+          callback: (value) => Number(value).toFixed(2),
+        },
+      },
+    },
+  };
+
+  const macdHistogramOptions: ChartOptions<'bar'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: isDark ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+        titleColor: isDark ? '#fff' : '#000',
+        bodyColor: isDark ? '#fff' : '#000',
+        callbacks: {
+          label: (context) => `Histogram: ${context.parsed.y?.toFixed(4) || 'N/A'}`,
+        },
+      },
+    },
+    scales: {
+      x: { display: false },
+      y: { display: false, grid: { display: false } },
+    },
+  };
+
   // Get current RSI value
   const currentRSI = rsiData.filter((v): v is number => v !== null).pop();
   const rsiStatus: RSIStatus = currentRSI !== undefined && currentRSI > 70 
@@ -408,7 +701,7 @@ export default function CryptoChart({ coinData, loading }: CryptoChartProps) {
             {periodChange !== null && periodChange >= 0 ? '▲' : '▼'} {Math.abs(periodChange ?? 0).toFixed(2)}%
           </span>
         </div>
-        {currentRSI !== undefined && (
+        {enabledStudies.rsi && currentRSI !== undefined && (
           <a 
             href={rsiInfoUrl}
             target="_blank"
@@ -429,33 +722,85 @@ export default function CryptoChart({ coinData, loading }: CryptoChartProps) {
         <Line data={priceChartData} options={priceOptions} />
       </div>
 
+      {/* Chart Legend for overlay studies */}
+      {(enabledStudies.sma || enabledStudies.bollingerBands) && (
+        <div className="chart-legend">
+          {enabledStudies.sma && (
+            <>
+              <a href={SMA_INFO.source} target="_blank" rel="noopener noreferrer" className="legend-item" title={smaConfig.description}>
+                <span className="legend-color" style={{ background: isDark ? COLORS.smaShort.dark : COLORS.smaShort.light }}></span>
+                <span>SMA {smaConfig.shortPeriod}</span>
+              </a>
+              <a href={SMA_INFO.source} target="_blank" rel="noopener noreferrer" className="legend-item" title={smaConfig.description}>
+                <span className="legend-color" style={{ background: isDark ? COLORS.smaLong.dark : COLORS.smaLong.light }}></span>
+                <span>SMA {smaConfig.longPeriod}</span>
+              </a>
+            </>
+          )}
+          {enabledStudies.bollingerBands && (
+            <a href={BOLLINGER_INFO.source} target="_blank" rel="noopener noreferrer" className="legend-item" title={bollingerConfig.description}>
+              <span className="legend-color" style={{ background: isDark ? COLORS.bollingerMiddle.dark : COLORS.bollingerMiddle.light }}></span>
+              <span>BB ({bollingerConfig.period}, {bollingerConfig.stdDev})</span>
+            </a>
+          )}
+        </div>
+      )}
+
       {/* RSI Chart */}
-      <div className="rsi-chart-container">
-        <div className="rsi-chart-header">
-          <a 
-            href={rsiInfoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="indicator-label-link"
-            title={rsiDescription}
-          >
-            <span className="indicator-label">RSI ({rsiPeriod})</span>
-            <span className="info-icon">ⓘ</span>
-          </a>
-          <div className="rsi-levels">
-            <span className="level overbought" title={RSI_INFO.levels?.overbought}>70 - Overbought</span>
-            <span className="level oversold" title={RSI_INFO.levels?.oversold}>30 - Oversold</span>
+      {enabledStudies.rsi && (
+        <div className="rsi-chart-container">
+          <div className="rsi-chart-header">
+            <a 
+              href={rsiInfoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="indicator-label-link"
+              title={rsiDescription}
+            >
+              <span className="indicator-label">RSI ({rsiPeriod})</span>
+              <span className="info-icon">ⓘ</span>
+            </a>
+            <div className="rsi-levels">
+              <span className="level overbought" title={RSI_INFO.levels?.overbought}>70 - Overbought</span>
+              <span className="level oversold" title={RSI_INFO.levels?.oversold}>30 - Oversold</span>
+            </div>
+          </div>
+          <div className="rsi-chart-wrapper">
+            {/* Overbought/Oversold zones */}
+            <div className="rsi-zones">
+              <div className="overbought-zone"></div>
+              <div className="oversold-zone"></div>
+            </div>
+            <Line data={rsiChartData} options={rsiOptions} />
           </div>
         </div>
-        <div className="rsi-chart-wrapper">
-          {/* Overbought/Oversold zones */}
-          <div className="rsi-zones">
-            <div className="overbought-zone"></div>
-            <div className="oversold-zone"></div>
+      )}
+
+      {/* MACD Chart */}
+      {enabledStudies.macd && (
+        <div className="macd-chart-container">
+          <div className="macd-chart-header">
+            <a 
+              href={MACD_INFO.source}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="indicator-label-link"
+              title={macdConfig.description}
+            >
+              <span className="indicator-label">MACD ({macdConfig.fastPeriod}/{macdConfig.slowPeriod}/{macdConfig.signalPeriod})</span>
+              <span className="info-icon">ⓘ</span>
+            </a>
           </div>
-          <Line data={rsiChartData} options={rsiOptions} />
+          <div className="macd-chart-wrapper">
+            <div className="macd-histogram">
+              <Bar data={macdHistogramData} options={macdHistogramOptions} />
+            </div>
+            <div className="macd-lines">
+              <Line data={macdChartData} options={macdOptions} />
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

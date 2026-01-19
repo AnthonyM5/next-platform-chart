@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import type { Theme, TimePeriod, Currency, ViewMode, Notification, PriceAlerts } from '../types';
+import type { Theme, TimePeriod, Currency, ViewMode, Notification, PriceAlerts, EnabledStudies, StudyType } from '../types';
 
 interface CryptoState {
   // Theme
@@ -30,6 +30,10 @@ interface CryptoState {
   // View mode
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
+
+  // Technical Studies
+  enabledStudies: EnabledStudies;
+  toggleStudy: (study: StudyType) => void;
 
   // Notifications
   notifications: Notification[];
@@ -119,6 +123,24 @@ export const useCryptoStore = create<CryptoState>((set, get) => ({
     return { viewMode: mode };
   }),
 
+  // Technical Studies
+  enabledStudies: {
+    rsi: true,
+    sma: false,
+    bollingerBands: false,
+    macd: false,
+  },
+  toggleStudy: (study: StudyType) => set((state) => {
+    const newStudies = {
+      ...state.enabledStudies,
+      [study]: !state.enabledStudies[study],
+    };
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('crypto-studies', JSON.stringify(newStudies));
+    }
+    return { enabledStudies: newStudies };
+  }),
+
   // Notifications
   notifications: [],
   addNotification: (notification: Omit<Notification, 'id'>) => set((state) => ({
@@ -156,6 +178,10 @@ export const useCryptoStore = create<CryptoState>((set, get) => ({
       const currency = (localStorage.getItem('crypto-currency') as Currency) || 'usd';
       const viewMode = (localStorage.getItem('crypto-viewmode') as ViewMode) || 'table';
       const priceAlerts: PriceAlerts = JSON.parse(localStorage.getItem('crypto-alerts') || '{}');
+      const enabledStudies: EnabledStudies = JSON.parse(
+        localStorage.getItem('crypto-studies') || 
+        '{"rsi":true,"sma":false,"bollingerBands":false,"macd":false}'
+      );
 
       set({
         theme,
@@ -165,6 +191,7 @@ export const useCryptoStore = create<CryptoState>((set, get) => ({
         currency,
         viewMode,
         priceAlerts,
+        enabledStudies,
       });
     }
   },

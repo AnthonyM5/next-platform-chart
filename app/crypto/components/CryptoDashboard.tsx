@@ -7,6 +7,7 @@ import CryptoChart from './CryptoChart';
 import ThemeToggle from './ThemeToggle';
 import TimePeriodSelector from './TimePeriodSelector';
 import ViewModeToggle from './ViewModeToggle';
+import StudiesDropdown from './StudiesDropdown';
 import ErrorBoundary from './ErrorBoundary';
 import type { Coin, ChartData } from '../types';
 
@@ -220,6 +221,7 @@ export default function CryptoDashboard() {
                   )}
                 </div>
                 <div className="chart-controls">
+                  <StudiesDropdown />
                   <TimePeriodSelector />
                   <button
                     onClick={() => {

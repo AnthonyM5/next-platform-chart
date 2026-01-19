@@ -112,6 +112,64 @@ export interface IndicatorInfo {
   source: string;
 }
 
+// Technical Studies Configuration
+export type StudyType = 'rsi' | 'sma' | 'bollingerBands' | 'macd';
+
+export interface EnabledStudies {
+  rsi: boolean;
+  sma: boolean;
+  bollingerBands: boolean;
+  macd: boolean;
+}
+
+// SMA Configuration per timeframe
+export interface SMAConfig {
+  shortPeriod: number;
+  longPeriod: number;
+  description: string;
+}
+
+export interface SMAConfigMap {
+  [key: string]: SMAConfig;
+}
+
+// MACD Configuration
+export interface MACDConfig {
+  fastPeriod: number;
+  slowPeriod: number;
+  signalPeriod: number;
+  description: string;
+}
+
+export interface MACDConfigMap {
+  [key: string]: MACDConfig;
+}
+
+// Bollinger Bands Configuration
+export interface BollingerConfig {
+  period: number;
+  stdDev: number;
+  description: string;
+}
+
+export interface BollingerConfigMap {
+  [key: string]: BollingerConfig;
+}
+
+// MACD Data
+export interface MACDData {
+  macdLine: (number | null)[];
+  signalLine: (number | null)[];
+  histogram: (number | null)[];
+}
+
+// Bollinger Bands Data
+export interface BollingerBandsData {
+  upper: (number | null)[];
+  middle: (number | null)[];
+  lower: (number | null)[];
+}
+
 // Sort configuration for tables
 export interface SortConfig {
   key: keyof Coin;
