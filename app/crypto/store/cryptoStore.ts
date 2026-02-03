@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import type { Theme, TimePeriod, Currency, ViewMode, Notification, PriceAlerts, EnabledStudies, StudyType } from '../types';
+import type { Theme, TimePeriod, Currency, ViewMode, Notification, PriceAlerts, EnabledStudies, StudyType, ChartPattern } from '../types';
 
 interface CryptoState {
   // Theme
@@ -30,6 +30,10 @@ interface CryptoState {
   // View mode
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
+
+  // Chart pattern (line or candlestick)
+  chartPattern: ChartPattern;
+  setChartPattern: (pattern: ChartPattern) => void;
 
   // Technical Studies
   enabledStudies: EnabledStudies;
@@ -123,6 +127,15 @@ export const useCryptoStore = create<CryptoState>((set, get) => ({
     return { viewMode: mode };
   }),
 
+  // Chart pattern
+  chartPattern: 'line',
+  setChartPattern: (pattern: ChartPattern) => set(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('crypto-chartpattern', pattern);
+    }
+    return { chartPattern: pattern };
+  }),
+
   // Technical Studies
   enabledStudies: {
     rsi: true,
@@ -177,6 +190,7 @@ export const useCryptoStore = create<CryptoState>((set, get) => ({
       const timePeriod = (localStorage.getItem('crypto-period') as TimePeriod) || '7';
       const currency = (localStorage.getItem('crypto-currency') as Currency) || 'usd';
       const viewMode = (localStorage.getItem('crypto-viewmode') as ViewMode) || 'table';
+      const chartPattern = (localStorage.getItem('crypto-chartpattern') as ChartPattern) || 'line';
       const priceAlerts: PriceAlerts = JSON.parse(localStorage.getItem('crypto-alerts') || '{}');
       const enabledStudies: EnabledStudies = JSON.parse(
         localStorage.getItem('crypto-studies') || 
@@ -190,6 +204,7 @@ export const useCryptoStore = create<CryptoState>((set, get) => ({
         timePeriod,
         currency,
         viewMode,
+        chartPattern,
         priceAlerts,
         enabledStudies,
       });

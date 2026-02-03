@@ -52,6 +52,31 @@ export interface ChartData {
   total_volumes: [number, number][];
 }
 
+// OHLC (Candlestick) data types
+export interface OHLCCandle {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number;
+}
+
+// Raw OHLC from CoinGecko: [timestamp, open, high, low, close]
+export type CoinGeckoOHLC = [number, number, number, number, number];
+
+// Raw OHLC from Coinbase: [time, low, high, open, close, volume]
+export type CoinbaseOHLC = [number, number, number, number, number, number];
+
+export interface OHLCData {
+  candles: OHLCCandle[];
+  provider: 'coingecko' | 'coinbase';
+  granularity: string; // e.g., "30m", "4h", "1d"
+}
+
+// Chart pattern options
+export type ChartPattern = 'line' | 'candlestick';
+
 export interface ApiResponse<T> {
   data: T;
   cached: boolean;

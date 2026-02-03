@@ -39,7 +39,11 @@ const STUDY_OPTIONS: StudyOption[] = [
   },
 ];
 
-export default function StudiesDropdown() {
+interface StudiesDropdownProps {
+  disabled?: boolean;
+}
+
+export default function StudiesDropdown({ disabled = false }: StudiesDropdownProps) {
   const { enabledStudies, toggleStudy } = useCryptoStore();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -60,12 +64,14 @@ export default function StudiesDropdown() {
   const activeCount = Object.values(enabledStudies).filter(Boolean).length;
 
   return (
-    <div className="studies-dropdown" ref={dropdownRef}>
+    <div className={`studies-dropdown ${disabled ? 'disabled' : ''}`} ref={dropdownRef}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`studies-dropdown-button ${isOpen ? 'active' : ''}`}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`studies-dropdown-button ${isOpen ? 'active' : ''} ${disabled ? 'disabled' : ''}`}
         aria-expanded={isOpen}
         aria-haspopup="true"
+        disabled={disabled}
+        title={disabled ? 'Studies not available for candlestick charts' : 'Technical indicators'}
       >
         <svg 
           xmlns="http://www.w3.org/2000/svg" 

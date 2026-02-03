@@ -4,21 +4,24 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCryptoStore } from '../store/cryptoStore';
 import CryptoTable from './CryptoTable';
 import CryptoChart from './CryptoChart';
+import CandlestickChart from './CandlestickChart';
+import ChartPatternToggle from './ChartPatternToggle';
 import ThemeToggle from './ThemeToggle';
 import TimePeriodSelector from './TimePeriodSelector';
 import ViewModeToggle from './ViewModeToggle';
 import StudiesDropdown from './StudiesDropdown';
 import ErrorBoundary from './ErrorBoundary';
 import FreshnessIndicator from './FreshnessIndicator';
-import type { Coin, ChartData } from '../types';
+import type { Coin, ChartData, OHLCData } from '../types';
 
 export default function CryptoDashboard() {
-  const { timePeriod, currency, addNotification, initFromStorage } = useCryptoStore();
+  const { timePeriod, currency, chartPattern, addNotification, initFromStorage } = useCryptoStore();
   const [coins, setCoins] = useState<Coin[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCoin, setSelectedCoin] = useState<string | null>(null);
   const [chartData, setChartData] = useState<ChartData | null>(null);
+  const [ohlcData, setOhlcData] = useState<OHLCData | null>(null);
   const [chartLoading, setChartLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [listFetchedAt, setListFetchedAt] = useState<number | null>(null);
@@ -92,6 +95,32 @@ export default function CryptoDashboard() {
     }
   }, [timePeriod, currency, addNotification]);
 
+  // Fetch OHLC data for candlestick chart
+  const fetchOhlcData = useCallback(async (coinId: string) => {
+    try {
+      setChartLoading(true);
+      
+      const response = await fetch(`/crypto/api/ohlc?id=${coinId}&days=${timePeriod}&vs_currency=${currency}&provider=auto`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch OHLC data');
+      }
+
+      const result = await response.json();
+      setOhlcData(result.data);
+      setChartFetchedAt(result.fetchedAt ?? Date.now());
+      setSelectedCoin(coinId);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      addNotification({
+        type: 'error',
+        message: `Failed to fetch OHLC data: ${errorMessage}`,
+      });
+    } finally {
+      setChartLoading(false);
+    }
+  }, [timePeriod, currency, addNotification]);
+
   // Initial fetch
   useEffect(() => {
     fetchCoins();
@@ -108,12 +137,16 @@ export default function CryptoDashboard() {
     return () => clearInterval(interval);
   }, [fetchCoins, autoRefresh]);
 
-  // Refetch chart when time period changes
+  // Refetch chart when time period or chart pattern changes
   useEffect(() => {
     if (selectedCoin) {
-      fetchChartData(selectedCoin);
+      if (chartPattern === 'candlestick') {
+        fetchOhlcData(selectedCoin);
+      } else {
+        fetchChartData(selectedCoin);
+      }
     }
-  }, [timePeriod, selectedCoin, fetchChartData]);
+  }, [timePeriod, chartPattern, selectedCoin, fetchChartData, fetchOhlcData]);
 
   // Export data functionality
   const exportData = () => {
@@ -143,8 +176,13 @@ export default function CryptoDashboard() {
     if (selectedCoin === coinId) {
       setSelectedCoin(null);
       setChartData(null);
+      setOhlcData(null);
     } else {
-      fetchChartData(coinId);
+      if (chartPattern === 'candlestick') {
+        fetchOhlcData(coinId);
+      } else {
+        fetchChartData(coinId);
+      }
       // Scroll to chart after a short delay to allow render
       setTimeout(() => {
         chartSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -234,12 +272,14 @@ export default function CryptoDashboard() {
                   )}
                 </div>
                 <div className="chart-controls">
+                  <ChartPatternToggle />
                   <StudiesDropdown />
                   <TimePeriodSelector />
                   <button
                     onClick={() => {
                       setSelectedCoin(null);
                       setChartData(null);
+                      setOhlcData(null);
                     }}
                     className="close-chart-button"
                     aria-label="Close chart"
@@ -248,7 +288,11 @@ export default function CryptoDashboard() {
                   </button>
                 </div>
               </div>
-              <CryptoChart coinData={chartData} loading={chartLoading} />
+              {chartPattern === 'candlestick' ? (
+                <CandlestickChart ohlcData={ohlcData} loading={chartLoading} />
+              ) : (
+                <CryptoChart coinData={chartData} loading={chartLoading} />
+              )}
             </section>
           )}
 

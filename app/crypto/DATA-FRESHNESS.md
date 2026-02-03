@@ -68,32 +68,72 @@ CoinGecko's free API does **not** provide websockets. Below are options for true
 | **CoinGecko Pro** | REST (1 s granularity) | ✗ (paid) | Up to 500 req/min |
 | **CryptoCompare** | WebSocket | ✓ (limited) | Free streaming for top coins |
 | **Binance** | WebSocket | ✓ | Real-time for Binance-listed pairs |
-| **Coinbase** | WebSocket | ✓ | Real-time for Coinbase pairs |
+| **Coinbase Exchange** | REST + WebSocket | ✓ | Real-time for Coinbase pairs, see below |
 | **CoinCap.io** | WebSocket | ✓ | Free streaming, most major coins |
 | **Finnhub** | WebSocket | ✓ | Crypto + stocks; limited free |
 
-### Recommended: CoinCap WebSocket
+---
+
+## Coinbase Exchange API (Recommended for OHLC)
+
+The **Coinbase Exchange API** is free for public market data and provides:
+
+| Feature | Detail |
+|---------|--------|
+| OHLC Candles | 1m, 5m, 15m, 1h, 6h, 1d granularity |
+| Rate Limit | ~10 req/s (public endpoints) |
+| Auth Required | ❌ No (for public data) |
+| Pairs Available | ~200 USD pairs (BTC, ETH, SOL, etc.) |
+| Precision | Full decimal precision |
+
+### Granularity Comparison
+
+| Time Range | CoinGecko (Free) | Coinbase Exchange |
+|------------|------------------|-------------------|
+| 1 day | 30 min candles | **5 min candles** |
+| 7 days | 4 hour candles | **1 hour candles** |
+| 30 days | 4 hour candles | **6 hour candles** |
+| 1 year | 4 day candles | **1 day candles** |
+
+### Implemented Integration
+
+The `/crypto/api/ohlc` route automatically uses Coinbase when:
+1. The coin has a USD pair on Coinbase (BTC, ETH, SOL, etc.)
+2. The currency is USD
+3. Fallback to CoinGecko for unsupported coins
 
 ```ts
-// Example client
-const ws = new WebSocket('wss://ws.coincap.io/prices?assets=bitcoin,ethereum');
-ws.onmessage = (msg) => {
-  const prices = JSON.parse(msg.data); // { bitcoin: "50123.45", ... }
-  // Update UI here
-};
+// The OHLC endpoint auto-selects the best provider
+const response = await fetch('/crypto/api/ohlc?id=bitcoin&days=7&provider=auto');
+// Returns: { data: { candles: [...], provider: 'coinbase', granularity: '1h' } }
 ```
 
-Advantages:
-- No rate limits on inbound streaming
-- Sub-second latency
-- Free tier covers most top-100 coins
+### Coinbase Supported Coins
 
-### Migration Checklist
+Common coins with Coinbase USD pairs (auto-detected):
+- BTC, ETH, LTC, BCH, XRP, ADA, SOL, DOT, DOGE, AVAX
+- LINK, MATIC, UNI, XLM, ATOM, SHIB, TRX, WBTC
 
-1. Add a WebSocket provider adapter (`app/crypto/utils/realtimeProvider.ts`)
-2. Maintain REST fallback for initial load
-3. Reconcile websocket prices with REST metadata (market cap, 24h change)
-4. Display "Streaming" badge next to FreshnessIndicator when connected
+### WebSocket for Real-Time
+
+For sub-second updates, use Coinbase WebSocket:
+
+```ts
+const ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    type: 'subscribe',
+    product_ids: ['BTC-USD', 'ETH-USD'],
+    channels: ['ticker']
+  }));
+};
+ws.onmessage = (msg) => {
+  const data = JSON.parse(msg.data);
+  if (data.type === 'ticker') {
+    console.log(data.product_id, data.price); // Real-time price
+  }
+};
+```
 
 ---
 
