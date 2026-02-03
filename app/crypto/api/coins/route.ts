@@ -3,17 +3,50 @@ import type { Coin, ApiResponse } from '../../types';
 
 // Cache configuration
 const CACHE_DURATION = 30000; // 30 seconds
+const MAX_RETRIES = 3;
+const INITIAL_BACKOFF_MS = 1000;
 
 interface CacheEntry {
   data: Coin[] | null;
   timestamp: number | null;
+  fetchedAt: number | null; // when upstream API was last contacted
   key?: string;
 }
 
 let cache: CacheEntry = {
   data: null,
   timestamp: null,
+  fetchedAt: null,
 };
+
+/**
+ * Exponential-backoff fetch helper
+ */
+async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<Response> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        headers: { 'Accept': 'application/json' },
+        next: { revalidate: 30 },
+      });
+      // 429 = rate-limited; wait and retry
+      if (response.status === 429 && attempt < retries - 1) {
+        const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
+        console.log(`Rate limited, backing off ${backoff}ms (attempt ${attempt + 1})`);
+        await new Promise((r) => setTimeout(r, backoff));
+        continue;
+      }
+      return response;
+    } catch (err) {
+      lastError = err as Error;
+      const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
+      console.log(`Fetch error, backing off ${backoff}ms (attempt ${attempt + 1})`);
+      await new Promise((r) => setTimeout(r, backoff));
+    }
+  }
+  throw lastError ?? new Error('Fetch failed after retries');
+}
 
 export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse<Coin[]> | { error: string; message: string }>> {
   try {
@@ -32,6 +65,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
         data: cache.data,
         cached: true,
         timestamp: cache.timestamp,
+        fetchedAt: cache.fetchedAt!,
       });
     }
 
@@ -42,12 +76,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
       apiUrl += `&ids=${ids}`;
     }
 
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Accept': 'application/json',
-      },
-      next: { revalidate: 30 } // Next.js caching
-    });
+    const response = await fetchWithRetry(apiUrl);
 
     if (!response.ok) {
       // If rate limited (429) and we have cached data, return it
@@ -58,17 +87,20 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
           cached: true,
           stale: true,
           timestamp: cache.timestamp!,
+          fetchedAt: cache.fetchedAt!,
         });
       }
       throw new Error(`CoinGecko API error: ${response.status}`);
     }
 
     const data: Coin[] = await response.json();
+    const fetchedAt = now;
 
     // Update cache
     cache = {
       data,
       timestamp: now,
+      fetchedAt,
       key: cacheKey,
     };
 
@@ -76,6 +108,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
       data,
       cached: false,
       timestamp: now,
+      fetchedAt,
     });
   } catch (error) {
     console.error('Error fetching cryptocurrency data:', error);
@@ -86,6 +119,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
         cached: true,
         stale: true,
         timestamp: cache.timestamp!,
+        fetchedAt: cache.fetchedAt!,
       });
     }
     return NextResponse.json(

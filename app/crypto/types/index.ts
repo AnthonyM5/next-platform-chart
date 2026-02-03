@@ -57,6 +57,8 @@ export interface ApiResponse<T> {
   cached: boolean;
   stale?: boolean;
   timestamp: number;
+  /** Epoch ms when upstream API was contacted */
+  fetchedAt: number;
 }
 
 export interface ApiError {

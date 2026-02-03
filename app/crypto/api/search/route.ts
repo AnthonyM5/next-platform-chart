@@ -5,11 +5,13 @@ import type { CoinSearchResult, ApiResponse } from '../../types';
 interface SearchCache {
   data: CoinSearchResult[] | null;
   timestamp: number | null;
+  fetchedAt: number | null;
 }
 
 let searchCache: SearchCache = {
   data: null,
   timestamp: null,
+  fetchedAt: null,
 };
 
 const CACHE_DURATION = 3600000; // 1 hour for search list
@@ -37,6 +39,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
 
       searchCache.data = await response.json();
       searchCache.timestamp = now;
+      searchCache.fetchedAt = now;
     }
 
     // Filter results if query provided
@@ -56,6 +59,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
       data: results,
       cached: true,
       timestamp: searchCache.timestamp!,
+      fetchedAt: searchCache.fetchedAt!,
     });
   } catch (error) {
     console.error('Error searching cryptocurrencies:', error);

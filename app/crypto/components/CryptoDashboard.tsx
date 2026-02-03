@@ -9,6 +9,7 @@ import TimePeriodSelector from './TimePeriodSelector';
 import ViewModeToggle from './ViewModeToggle';
 import StudiesDropdown from './StudiesDropdown';
 import ErrorBoundary from './ErrorBoundary';
+import FreshnessIndicator from './FreshnessIndicator';
 import type { Coin, ChartData } from '../types';
 
 export default function CryptoDashboard() {
@@ -20,6 +21,8 @@ export default function CryptoDashboard() {
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [chartLoading, setChartLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [listFetchedAt, setListFetchedAt] = useState<number | null>(null);
+  const [chartFetchedAt, setChartFetchedAt] = useState<number | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [mounted, setMounted] = useState(false);
   const chartSectionRef = useRef<HTMLElement>(null);
@@ -45,6 +48,7 @@ export default function CryptoDashboard() {
       const result = await response.json();
       setCoins(result.data);
       setLastUpdate(new Date());
+      setListFetchedAt(result.fetchedAt ?? Date.now());
       
       // Check for price alerts
       result.data.forEach((coin: Coin) => {
@@ -75,6 +79,7 @@ export default function CryptoDashboard() {
 
       const result = await response.json();
       setChartData(result.data);
+      setChartFetchedAt(result.fetchedAt ?? Date.now());
       setSelectedCoin(coinId);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
@@ -160,11 +165,19 @@ export default function CryptoDashboard() {
                 <span className="title-icon">₿</span>
                 Crypto Dashboard
               </h1>
-              {lastUpdate && (
-                <p className="last-update">
-                  Last updated: {lastUpdate.toLocaleTimeString()}
-                </p>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {lastUpdate && (
+                  <p className="last-update">
+                    Last updated: {lastUpdate.toLocaleTimeString()}
+                  </p>
+                )}
+                <FreshnessIndicator
+                  listFetchedAt={listFetchedAt}
+                  chartFetchedAt={chartFetchedAt}
+                  listPrice={selectedCoinData?.current_price}
+                  chartLatestPrice={chartData?.prices?.length ? chartData.prices[chartData.prices.length - 1][1] : undefined}
+                />
+              </div>
             </div>
             <div className="header-right">
               <button
