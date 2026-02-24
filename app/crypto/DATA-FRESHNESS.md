@@ -1,6 +1,29 @@
 # Data Freshness & Real-Time Updates
 
-This document describes how we detect stale data, handle CoinGecko rate limits, and options for event-based (websocket) real-time feeds.
+This document describes how live price streaming, staleness detection, and CoinGecko rate-limit handling work together in the dashboard.
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Browser                                            │
+│                                                     │
+│  useRealtimePrice (WebSocket)  ──▶  liveCoins       │
+│        │                               │            │
+│        │  wss://ws.coincap.io          ▼            │
+│        │                          CryptoTable       │
+│        │                       (always up-to-date)  │
+│        │                                            │
+│  CryptoDashboard (REST, 30 s)  ──▶  coins           │
+│   /crypto/api/coins                (market cap,     │
+│   /crypto/api/coin-history          volume, etc.)   │
+└─────────────────────────────────────────────────────┘
+```
+
+Prices shown in the table and chart header come from the **WebSocket feed**.  
+All other market data (market cap, volume, rank, 24 h %) is refreshed every **30 seconds** via REST.
 
 ---
 
@@ -18,14 +41,47 @@ The CoinGecko **free tier** REST API is rate-limited (~10-50 req/min depending o
 
 ## Solution Overview
 
-### 1. Freshness Tracking (`fetchedAt`)
+### 1. Real-Time WebSocket Price Feed (`useRealtimePrice`)
 
-Both `/crypto/api/coins` and `/crypto/api/coin-history` now return a `fetchedAt` timestamp (epoch ms) indicating when the upstream CoinGecko API was last contacted.
+Live prices are streamed via the **CoinCap WebSocket API** — free, no API key required.
+
+```ts
+// app/crypto/hooks/useRealtimePrice.ts
+const { prices, connected } = useRealtimePrice(coinIds);
+// prices: Record<coinGeckoId, latestPrice>
+// connected: boolean — true while WebSocket is open
+```
+
+**How it works:**
+
+1. Connects to `wss://ws.coincap.io/prices?assets=bitcoin,ethereum,...`
+2. Maps CoinGecko IDs ↔ CoinCap IDs automatically (see table below)
+3. Each incoming frame updates only the changed prices — no full re-render of the coin list
+4. If the connection drops, exponential back-off reconnect fires (up to 10 attempts, capped at ~2 min between tries)
+5. Falls back silently to REST-polled prices if WebSocket is unavailable
+
+**CoinGecko → CoinCap ID mapping:**
+
+| CoinGecko ID | CoinCap ID |
+|---|---|
+| `ripple` | `xrp` |
+| `binancecoin` | `binance-coin` |
+| `bitcoin-cash` | `bitcoin-cash-abc-2` |
+| `lido-staked-ether` | `staked-ether` |
+| *(all others)* | *(same ID)* |
+
+**FreshnessIndicator behaviour:**
+- WebSocket connected → **⚡ Live** (green pulsing dot)
+- WebSocket disconnected → falls back to REST age-based freshness check
+
+### 2. Freshness Tracking (`fetchedAt`)
+
+Both `/crypto/api/coins` and `/crypto/api/coin-history` return a `fetchedAt` timestamp (epoch ms) indicating when the upstream CoinGecko API was last contacted.
 
 The dashboard tracks these values and uses the `FreshnessIndicator` component to show:
 
-* 🟢 **Live** – data is within acceptable freshness thresholds
-* 🔴 **Stale** – data exceeds threshold or list/chart prices drift > 1%
+* 🟢 **Live** – WebSocket connected, or REST data within acceptable freshness thresholds
+* 🔴 **Stale** – REST data exceeds threshold or list/chart prices drift > 1%
 
 Thresholds (configurable in `utils/dataFreshness.ts`):
 
@@ -35,48 +91,60 @@ Thresholds (configurable in `utils/dataFreshness.ts`):
 | Chart | 5 min |
 | Price drift | 1% |
 
-### 2. Exponential Back-off & Retry
+### 3. Exponential Back-off & Retry (REST)
 
-API routes now use `fetchWithRetry()` which:
+API routes use `fetchWithRetry()` which:
 
 1. Catches network errors and 429 responses
 2. Waits `1s * 2^attempt` before retrying (up to 3 attempts)
 3. Falls back to stale cache on persistent failure
 
-### 3. Automated Tests
+---
 
-Run:
+## Automated Tests
+
+### Running tests
+
 ```bash
-npx vitest run app/crypto/utils/dataFreshness.test.ts
-# or with Jest
-npx jest app/crypto/utils/dataFreshness.test.ts
+npm test                  # single run
+npm run test:watch        # watch mode
 ```
 
-Tests cover:
-- `evaluateFreshness()` – age calculation
-- `detectPriceDrift()` – price divergence
-- `detectTimestampDrift()` – time gap between list and chart
+### Test files
+
+| File | What it tests |
+|------|---------------|
+| `app/crypto/utils/dataFreshness.test.ts` | `evaluateFreshness`, `detectPriceDrift`, `detectTimestampDrift` |
+| `app/crypto/hooks/useRealtimePrice.test.ts` | WebSocket lifecycle, price delivery, ID mapping, reconnect, cleanup |
+
+### `useRealtimePrice` test coverage
+
+- Hook returns empty prices and `connected: false` before any coinIds are provided
+- WebSocket URL is built with CoinCap IDs (CoinGecko IDs translated correctly)
+- `connected` transitions to `true` on WebSocket `open` event
+- Prices are stored under CoinGecko IDs (CoinCap IDs translated back)
+- `connected` transitions to `false` on `error` and `close` events
+- No reconnect attempt fires after hook unmount
+- Malformed JSON frames are silently ignored
 
 ---
 
 ## Websocket / Streaming Alternatives
 
-CoinGecko's free API does **not** provide websockets. Below are options for true real-time feeds:
-
 | Provider | Protocol | Free Tier | Notes |
 |----------|----------|-----------|-------|
+| **CoinCap** ✅ | WebSocket | ✓ | **Currently used.** Free streaming, most major coins |
 | **CoinGecko Pro** | REST (1 s granularity) | ✗ (paid) | Up to 500 req/min |
 | **CryptoCompare** | WebSocket | ✓ (limited) | Free streaming for top coins |
 | **Binance** | WebSocket | ✓ | Real-time for Binance-listed pairs |
-| **Coinbase Exchange** | REST + WebSocket | ✓ | Real-time for Coinbase pairs, see below |
-| **CoinCap.io** | WebSocket | ✓ | Free streaming, most major coins |
+| **Coinbase Exchange** | REST + WebSocket | ✓ | Real-time for Coinbase pairs |
 | **Finnhub** | WebSocket | ✓ | Crypto + stocks; limited free |
 
 ---
 
-## Coinbase Exchange API (Recommended for OHLC)
+## Coinbase Exchange API (OHLC)
 
-The **Coinbase Exchange API** is free for public market data and provides:
+The **Coinbase Exchange API** is free for public market data and is used automatically for OHLC candlestick data when available.
 
 | Feature | Detail |
 |---------|--------|
@@ -84,56 +152,8 @@ The **Coinbase Exchange API** is free for public market data and provides:
 | Rate Limit | ~10 req/s (public endpoints) |
 | Auth Required | ❌ No (for public data) |
 | Pairs Available | ~200 USD pairs (BTC, ETH, SOL, etc.) |
-| Precision | Full decimal precision |
 
-### Granularity Comparison
-
-| Time Range | CoinGecko (Free) | Coinbase Exchange |
-|------------|------------------|-------------------|
-| 1 day | 30 min candles | **5 min candles** |
-| 7 days | 4 hour candles | **1 hour candles** |
-| 30 days | 4 hour candles | **6 hour candles** |
-| 1 year | 4 day candles | **1 day candles** |
-
-### Implemented Integration
-
-The `/crypto/api/ohlc` route automatically uses Coinbase when:
-1. The coin has a USD pair on Coinbase (BTC, ETH, SOL, etc.)
-2. The currency is USD
-3. Fallback to CoinGecko for unsupported coins
-
-```ts
-// The OHLC endpoint auto-selects the best provider
-const response = await fetch('/crypto/api/ohlc?id=bitcoin&days=7&provider=auto');
-// Returns: { data: { candles: [...], provider: 'coinbase', granularity: '1h' } }
-```
-
-### Coinbase Supported Coins
-
-Common coins with Coinbase USD pairs (auto-detected):
-- BTC, ETH, LTC, BCH, XRP, ADA, SOL, DOT, DOGE, AVAX
-- LINK, MATIC, UNI, XLM, ATOM, SHIB, TRX, WBTC
-
-### WebSocket for Real-Time
-
-For sub-second updates, use Coinbase WebSocket:
-
-```ts
-const ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
-ws.onopen = () => {
-  ws.send(JSON.stringify({
-    type: 'subscribe',
-    product_ids: ['BTC-USD', 'ETH-USD'],
-    channels: ['ticker']
-  }));
-};
-ws.onmessage = (msg) => {
-  const data = JSON.parse(msg.data);
-  if (data.type === 'ticker') {
-    console.log(data.product_id, data.price); // Real-time price
-  }
-};
-```
+The `/crypto/api/ohlc` route automatically uses Coinbase when the coin has a USD pair, falling back to CoinGecko for unsupported coins.
 
 ---
 
@@ -141,8 +161,10 @@ ws.onmessage = (msg) => {
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| `COINGECKO_API_KEY` | (none) | Optional Pro API key |
-| `REALTIME_PROVIDER` | `rest` | `rest` or `coincap` |
+| `NEXT_PUBLIC_COINGECKO_API_KEY` | (none) | Optional CoinGecko Pro API key |
+| `CACHE_DURATION_COINS` | `30000` | Coin list cache duration (ms) |
+| `CACHE_DURATION_HISTORY` | `300000` | Historical data cache duration (ms) |
+| `AUTO_REFRESH_INTERVAL` | `30000` | REST polling interval (ms) |
 
 ---
 
@@ -150,13 +172,14 @@ ws.onmessage = (msg) => {
 
 1. Open DevTools → Network and look for `/crypto/api/coins` responses.
 2. Check the `fetchedAt` field matches the `timestamp` field (they should be close on fresh data).
-3. Hover the freshness dot in the header for detailed age info.
-4. Simulate stale data by throttling network or blocking the API; watch the indicator turn red.
+3. The **⚡ Live** indicator in the header confirms the WebSocket is streaming prices.
+4. Disconnect your internet briefly — the indicator will drop to **Stale** and reconnect automatically when restored.
 
 ---
 
 ## References
 
+- CoinCap WebSocket Docs: https://docs.coincap.io/#websocket
 - CoinGecko API Docs: https://www.coingecko.com/en/api/documentation
-- CoinCap WebSocket: https://docs.coincap.io/#websocket
 - CryptoCompare Streaming: https://min-api.cryptocompare.com/documentation/websockets
+
