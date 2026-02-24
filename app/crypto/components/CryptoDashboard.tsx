@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useCryptoStore } from '../store/cryptoStore';
+import { useRealtimePrice } from '../hooks/useRealtimePrice';
 import CryptoTable from './CryptoTable';
 import CryptoChart from './CryptoChart';
 import CandlestickChart from './CandlestickChart';
@@ -29,6 +30,20 @@ export default function CryptoDashboard() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [mounted, setMounted] = useState(false);
   const chartSectionRef = useRef<HTMLElement>(null);
+
+  // Real-time WebSocket price feed (CoinCap)
+  const coinIds = useMemo(() => coins.map((c) => c.id), [coins]);
+  const { prices: rtPrices, connected: wsConnected } = useRealtimePrice(coinIds);
+
+  // Merge live WebSocket prices into the REST-fetched coin list so every
+  // price in the table and chart header is always up-to-date.
+  const liveCoins = useMemo<Coin[]>(() => {
+    if (Object.keys(rtPrices).length === 0) return coins;
+    return coins.map((coin) => {
+      const livePrice = rtPrices[coin.id];
+      return livePrice !== undefined ? { ...coin, current_price: livePrice } : coin;
+    });
+  }, [coins, rtPrices]);
 
   // Initialize from storage on mount
   useEffect(() => {
@@ -148,10 +163,10 @@ export default function CryptoDashboard() {
     }
   }, [timePeriod, chartPattern, selectedCoin, fetchChartData, fetchOhlcData]);
 
-  // Export data functionality
+  // Export data with live prices included
   const exportData = () => {
     try {
-      const dataStr = JSON.stringify(coins, null, 2);
+      const dataStr = JSON.stringify(liveCoins, null, 2);
       const dataBlob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(dataBlob);
       const link = document.createElement('a');
@@ -190,7 +205,7 @@ export default function CryptoDashboard() {
     }
   };
 
-  const selectedCoinData = coins.find(c => c.id === selectedCoin);
+  const selectedCoinData = liveCoins.find(c => c.id === selectedCoin);
 
   return (
     <ErrorBoundary>
@@ -214,6 +229,7 @@ export default function CryptoDashboard() {
                   chartFetchedAt={chartFetchedAt}
                   listPrice={selectedCoinData?.current_price}
                   chartLatestPrice={chartData?.prices?.length ? chartData.prices[chartData.prices.length - 1][1] : undefined}
+                  wsConnected={wsConnected}
                 />
               </div>
             </div>
@@ -309,7 +325,7 @@ export default function CryptoDashboard() {
               </button>
             </div>
             <CryptoTable
-              coins={coins}
+              coins={liveCoins}
               loading={loading}
               onSelectCoin={handleSelectCoin}
             />
@@ -318,16 +334,13 @@ export default function CryptoDashboard() {
 
         {/* Footer */}
         <footer className="dashboard-footer">
-          <p>Data provided by CoinGecko API</p>
           <p>
-            <a 
-              href="https://www.coingecko.com" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="footer-link"
-            >
-              Visit CoinGecko
-            </a>
+            Prices stream live via{' '}
+            <a href="https://coincap.io" target="_blank" rel="noopener noreferrer" className="footer-link">CoinCap WebSocket</a>
+          </p>
+          <p>
+            Historical data from{' '}
+            <a href="https://www.coingecko.com" target="_blank" rel="noopener noreferrer" className="footer-link">CoinGecko</a>
           </p>
         </footer>
       </div>
