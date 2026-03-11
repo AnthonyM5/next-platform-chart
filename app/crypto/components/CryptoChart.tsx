@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { Line, Bar } from 'react-chartjs-2';
+import type { Chart as ChartJSType } from 'chart.js';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -198,9 +199,46 @@ const COLORS = {
   macdHistogramNeg: { light: '#ef4444', dark: '#f87171' },
 };
 
-export default function CryptoChart({ coinData, loading }: CryptoChartProps) {
+/** Throttle live chart updates to at most one repaint per second. */
+const LIVE_UPDATE_THROTTLE_MS = 1_000;
+
+export default function CryptoChart({ coinData, loading, livePrice }: CryptoChartProps) {
   const { theme, timePeriod, enabledStudies } = useCryptoStore();
   const isDark = theme === 'dark';
+
+  /**
+   * Ref to the price Line chart instance.  Used for imperative updates when
+   * live WebSocket prices arrive so we avoid a full React re-render of this
+   * 800-line component on every tick.
+   */
+  const priceChartRef = useRef<ChartJSType<'line'> | null>(null);
+  /** Epoch ms of the last imperative chart update — used to throttle repaints. */
+  const lastLiveUpdateRef = useRef<number>(0);
+
+  /**
+   * Imperatively update the last data-point on the price chart whenever a new
+   * live price arrives.  chart.update('none') skips animations, giving a
+   * smooth continuous feel rather than a jarring frame jump.
+   *
+   * This effect only touches the Chart.js instance; it does NOT trigger a
+   * React re-render of the component.
+   */
+  useEffect(() => {
+    if (livePrice == null) return;
+    const chart = priceChartRef.current;
+    if (!chart) return;
+
+    const dataset = chart.data.datasets[0]?.data;
+    if (!dataset || dataset.length === 0) return;
+
+    const now = Date.now();
+    if (now - lastLiveUpdateRef.current < LIVE_UPDATE_THROTTLE_MS) return;
+    lastLiveUpdateRef.current = now;
+
+    // Replace the last (most-recent) price point with the live WebSocket price.
+    dataset[dataset.length - 1] = livePrice;
+    chart.update('none');
+  }, [livePrice]);
 
   // Calculate all indicators
   const {
@@ -719,7 +757,7 @@ export default function CryptoChart({ coinData, loading }: CryptoChartProps) {
 
       {/* Price Chart */}
       <div className="price-chart-container">
-        <Line data={priceChartData} options={priceOptions} />
+        <Line ref={priceChartRef} data={priceChartData} options={priceOptions} />
       </div>
 
       {/* Chart Legend for overlay studies */}

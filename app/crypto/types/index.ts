@@ -227,6 +227,12 @@ export interface CryptoTableProps {
 export interface CryptoChartProps {
   coinData: ChartData | null;
   loading: boolean;
+  /**
+   * Latest live price from the WebSocket feed.  When provided the chart
+   * updates the last data-point imperatively (via Chart.js ref) without
+   * triggering a full React re-render.  Throttled internally to ≤1 Hz.
+   */
+  livePrice?: number;
 }
 
 export interface LoadingSkeletonProps {

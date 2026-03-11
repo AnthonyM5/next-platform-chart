@@ -64,6 +64,49 @@ app/crypto/
 └── page.tsx                     # Page entry point
 ```
 
+## ⚡ Live Price Architecture
+
+The dashboard combines two data sources so prices are always current:
+
+| Source | Data | Update frequency |
+|--------|------|-----------------|
+| CoinGecko REST | Historical prices, market data | Polled every 30 s |
+| CoinCap WebSocket | Current ticker price | Streaming (sub-second) |
+
+### How live prices reach the UI
+
+```
+CoinCap WS → useRealtimePrice hook → Zustand.rtPrices
+                                            │
+                                            ├─► LivePrice (table rows + chart header)
+                                            ├─► CryptoTable (via merged liveCoins)
+                                            └─► CryptoChart (via livePrice prop ★)
+```
+
+★ **Charts update without React re-renders** — `CryptoChart` holds a `ref` to
+the Chart.js instance.  When a live price arrives it mutates the last data-point
+directly (`chart.data.datasets[0].data[lastIndex] = price`) and calls
+`chart.update('none')` — a Chart.js internal repaint with no animations and no
+React reconciliation.  Updates are throttled to ≤1 per second to keep the chart
+smooth and readable.
+
+### Why Zustand for `rtPrices`?
+
+`LivePrice` components live inside every table row (up to 100 rows).  Storing
+prices in Zustand and using per-coin selectors (`state => state.rtPrices[coinId]`)
+ensures that only the specific row whose coin changed re-renders, not the entire
+table.
+
+### WebSocket reconnect on coin-list changes
+
+`useRealtimePrice` tracks a sorted key of all coin IDs.  When the 30-second REST
+refresh returns a different coin set, the hook closes the existing WebSocket and
+opens a new one subscribed to the updated asset list.
+
+> **Full details:** See [app/crypto/ARCHITECTURE.md](./app/crypto/ARCHITECTURE.md)
+
+---
+
 ## 📈 Technical Indicators Deep Dive
 
 ### RSI (Relative Strength Index)
