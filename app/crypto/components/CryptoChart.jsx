@@ -173,9 +173,9 @@ export default function CryptoChart({ coinData, loading }) {
   const isDark = theme === 'dark';
 
   // Calculate RSI and period change
-  const { rsiData, periodChange, prices, labels, rsiPeriod } = useMemo(() => {
+  const { rsiData, periodChange, prices, labels, rsiPeriod, rsiDescription } = useMemo(() => {
     if (!coinData || !coinData.prices || coinData.prices.length === 0) {
-      return { rsiData: [], periodChange: null, prices: [], labels: [], rsiPeriod: 14 };
+      return { rsiData: [], periodChange: null, prices: [], labels: [], rsiPeriod: 14, rsiDescription: getRSIDescription(timePeriod) };
     }
 
     const priceValues = coinData.prices.map(([_, price]) => price);
@@ -386,9 +386,6 @@ export default function CryptoChart({ coinData, loading }) {
   // Get current RSI value
   const currentRSI = rsiData.filter(v => v !== null).pop();
   const rsiStatus = currentRSI > 70 ? 'overbought' : currentRSI < 30 ? 'oversold' : 'neutral';
-  const { rsiDescription } = useMemo(() => ({
-    rsiDescription: getRSIDescription(timePeriod)
-  }), [timePeriod]);
 
   return (
     <div className="crypto-chart">

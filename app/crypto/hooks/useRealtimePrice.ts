@@ -120,6 +120,7 @@ export function useRealtimePrice(coinIds: string[]): RealtimePriceResult {
             RECONNECT_DELAY_MS * Math.pow(1.5, reconnectAttemptsRef.current);
           reconnectAttemptsRef.current += 1;
           reconnectTimerRef.current = setTimeout(() => {
+            // eslint-disable-next-line react-hooks/immutability
             if (mountedRef.current) connect();
           }, delay);
         }
