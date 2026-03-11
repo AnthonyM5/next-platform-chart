@@ -222,6 +222,8 @@ export interface CryptoTableProps {
   coins: Coin[];
   loading: boolean;
   onSelectCoin?: (coinId: string) => void;
+  /** Live WebSocket prices keyed by CoinGecko coin ID */
+  rtPrices?: Record<string, number>;
 }
 
 export interface CryptoChartProps {

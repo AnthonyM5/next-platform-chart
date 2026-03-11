@@ -282,7 +282,7 @@ export default function CryptoDashboard() {
                       <div>
                         <h2 className="selected-coin-name">{selectedCoinData.name}</h2>
                         <div className="selected-coin-price">
-                          <LivePrice price={selectedCoinData.current_price} className="price" />
+                          <LivePrice price={rtPrices[selectedCoin!] ?? selectedCoinData.current_price} className="price" />
                         </div>
                       </div>
                     </div>
@@ -329,6 +329,7 @@ export default function CryptoDashboard() {
               coins={liveCoins}
               loading={loading}
               onSelectCoin={handleSelectCoin}
+              rtPrices={rtPrices}
             />
           </section>
         </main>
