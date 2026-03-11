@@ -49,12 +49,6 @@ interface CryptoState {
   setPriceAlert: (coinId: string, threshold: number) => void;
   removePriceAlert: (coinId: string) => void;
 
-  // Real-time prices (WebSocket)
-  rtPrices: Record<string, number>;
-  wsConnected: boolean;
-  setRtPrices: (prices: Record<string, number>) => void;
-  setWsConnected: (connected: boolean) => void;
-
   // Initialize from localStorage
   initFromStorage: () => void;
 }
@@ -186,12 +180,6 @@ export const useCryptoStore = create<CryptoState>((set, get) => ({
     }
     return { priceAlerts: alerts };
   }),
-
-  // Real-time prices (WebSocket)
-  rtPrices: {},
-  wsConnected: false,
-  setRtPrices: (prices: Record<string, number>) => set({ rtPrices: prices }),
-  setWsConnected: (connected: boolean) => set({ wsConnected: connected }),
 
   // Initialize from localStorage
   initFromStorage: () => {
