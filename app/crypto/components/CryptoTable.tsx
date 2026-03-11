@@ -139,7 +139,7 @@ export default function CryptoTable({ coins, loading, onSelectCoin }: CryptoTabl
               <div className="card-body">
                 <div className="price-row">
                   <span className="label">Price:</span>
-                  <LivePrice coinId={coin.id} fallbackPrice={coin.current_price} className="value" />
+                  <LivePrice price={coin.current_price} className="value" />
                 </div>
                 <div className="change-row">
                   <span className="label">24h:</span>
@@ -246,12 +246,12 @@ export default function CryptoTable({ coins, loading, onSelectCoin }: CryptoTabl
                     <div className="coin-details">
                       <span className="coin-name-text">{coin.name}</span>
                       <span className="coin-symbol-text">{coin.symbol.toUpperCase()}</span>
-                      <LivePrice coinId={coin.id} fallbackPrice={coin.current_price} showDirection={false} className="coin-price-mobile" />
+                      <LivePrice price={coin.current_price} showDirection={false} className="coin-price-mobile" />
                     </div>
                   </div>
                 </td>
                 <td className="text-right font-semibold">
-                  <LivePrice coinId={coin.id} fallbackPrice={coin.current_price} />
+                  <LivePrice price={coin.current_price} />
                 </td>
                 <td className="text-right">
                   <span className={`change-badge ${coin.price_change_percentage_24h >= 0 ? 'positive' : 'negative'}`}>

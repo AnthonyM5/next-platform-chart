@@ -17,7 +17,7 @@ import LivePrice from './LivePrice';
 import type { Coin, ChartData, OHLCData } from '../types';
 
 export default function CryptoDashboard() {
-  const { timePeriod, currency, chartPattern, addNotification, initFromStorage, setRtPrices, setWsConnected } = useCryptoStore();
+  const { timePeriod, currency, chartPattern, addNotification, initFromStorage } = useCryptoStore();
   const [coins, setCoins] = useState<Coin[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,11 +35,6 @@ export default function CryptoDashboard() {
   // Real-time WebSocket price feed (CoinCap)
   const coinIds = useMemo(() => coins.map((c) => c.id), [coins]);
   const { prices: rtPrices, connected: wsConnected } = useRealtimePrice(coinIds);
-
-  // Sync WebSocket prices into the Zustand store so LivePrice components
-  // can subscribe individually without re-rendering the whole table.
-  useEffect(() => { setRtPrices(rtPrices); }, [rtPrices, setRtPrices]);
-  useEffect(() => { setWsConnected(wsConnected); }, [wsConnected, setWsConnected]);
 
   // Merge live WebSocket prices into the REST-fetched coin list so every
   // price in the table and chart header is always up-to-date.
@@ -287,7 +282,7 @@ export default function CryptoDashboard() {
                       <div>
                         <h2 className="selected-coin-name">{selectedCoinData.name}</h2>
                         <div className="selected-coin-price">
-                          <LivePrice coinId={selectedCoin!} fallbackPrice={selectedCoinData.current_price} className="price" />
+                          <LivePrice price={selectedCoinData.current_price} className="price" />
                         </div>
                       </div>
                     </div>
