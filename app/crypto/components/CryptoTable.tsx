@@ -2,6 +2,7 @@
 
 import { useState, useMemo, MouseEvent } from 'react';
 import { useCryptoStore } from '../store/cryptoStore';
+import LivePrice from './LivePrice';
 import type { Coin, CryptoTableProps, SortConfig } from '../types';
 
 export default function CryptoTable({ coins, loading, onSelectCoin }: CryptoTableProps) {
@@ -138,7 +139,7 @@ export default function CryptoTable({ coins, loading, onSelectCoin }: CryptoTabl
               <div className="card-body">
                 <div className="price-row">
                   <span className="label">Price:</span>
-                  <span className="value">${formatNumber(coin.current_price)}</span>
+                  <LivePrice coinId={coin.id} fallbackPrice={coin.current_price} className="value" />
                 </div>
                 <div className="change-row">
                   <span className="label">24h:</span>
@@ -245,11 +246,13 @@ export default function CryptoTable({ coins, loading, onSelectCoin }: CryptoTabl
                     <div className="coin-details">
                       <span className="coin-name-text">{coin.name}</span>
                       <span className="coin-symbol-text">{coin.symbol.toUpperCase()}</span>
-                      <span className="coin-price-mobile">${formatNumber(coin.current_price)}</span>
+                      <LivePrice coinId={coin.id} fallbackPrice={coin.current_price} showDirection={false} className="coin-price-mobile" />
                     </div>
                   </div>
                 </td>
-                <td className="text-right font-semibold">${formatNumber(coin.current_price)}</td>
+                <td className="text-right font-semibold">
+                  <LivePrice coinId={coin.id} fallbackPrice={coin.current_price} />
+                </td>
                 <td className="text-right">
                   <span className={`change-badge ${coin.price_change_percentage_24h >= 0 ? 'positive' : 'negative'}`}>
                     {coin.price_change_percentage_24h >= 0 ? '▲' : '▼'} {Math.abs(coin.price_change_percentage_24h).toFixed(2)}%
