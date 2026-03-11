@@ -313,7 +313,11 @@ export default function CryptoDashboard() {
               {chartPattern === 'candlestick' ? (
                 <CandlestickChart ohlcData={ohlcData} loading={chartLoading} />
               ) : (
-                <CryptoChart coinData={chartData} loading={chartLoading} />
+                <CryptoChart
+                coinData={chartData}
+                loading={chartLoading}
+                livePrice={selectedCoin ? rtPrices[selectedCoin] : undefined}
+              />
               )}
             </section>
           )}

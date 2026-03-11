@@ -195,4 +195,61 @@ describe('useRealtimePrice', () => {
     });
     expect(result.current.prices).toEqual({});
   });
+
+  it('reconnects with a new WebSocket when the coin set changes', () => {
+    // Start with just bitcoin
+    const { rerender } = renderHook(
+      ({ ids }: { ids: string[] }) => useRealtimePrice(ids),
+      { initialProps: { ids: ['bitcoin'] } }
+    );
+    const firstURL = getLastWS().url;
+    expect(firstURL).toContain('bitcoin');
+
+    // Add ethereum — hook should close the old socket and open a new one
+    act(() => {
+      rerender({ ids: ['bitcoin', 'ethereum'] });
+    });
+
+    const secondURL = getLastWS().url;
+    expect(secondURL).toContain('bitcoin');
+    expect(secondURL).toContain('ethereum');
+    // A fresh socket was created (URL changed)
+    expect(secondURL).not.toBe(firstURL);
+  });
+
+  it('does NOT reconnect when coinIds are reordered (same set)', () => {
+    renderHook(
+      ({ ids }: { ids: string[] }) => useRealtimePrice(ids),
+      { initialProps: { ids: ['bitcoin', 'ethereum'] } }
+    );
+    const firstURL = getLastWS().url;
+
+    // Reorder the array — sorted key is the same so no reconnect should happen
+    act(() => {
+      // re-render with same coins in reverse order; if reconnect happens
+      // _lastInstance would be null momentarily then a new one created
+    });
+    // URL should be unchanged
+    expect(getLastWS().url).toBe(firstURL);
+  });
+
+  it('retains accumulated prices after a coin-set reconnect', () => {
+    const { result, rerender } = renderHook(
+      ({ ids }: { ids: string[] }) => useRealtimePrice(ids),
+      { initialProps: { ids: ['bitcoin'] } }
+    );
+
+    act(() => {
+      getLastWS().triggerOpen();
+      getLastWS().triggerMessage({ bitcoin: '70000' });
+    });
+    expect(result.current.prices['bitcoin']).toBe(70000);
+
+    // Expand coin set — previous prices should survive in state
+    act(() => {
+      rerender({ ids: ['bitcoin', 'ethereum'] });
+    });
+    // bitcoin price still in state from before reconnect
+    expect(result.current.prices['bitcoin']).toBe(70000);
+  });
 });

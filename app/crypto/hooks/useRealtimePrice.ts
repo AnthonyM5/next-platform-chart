@@ -57,6 +57,14 @@ export function useRealtimePrice(coinIds: string[]): RealtimePriceResult {
   // Keep the ref in sync without triggering a reconnect on each render
   coinIdsRef.current = coinIds;
 
+  /**
+   * Tracks the sorted, comma-joined coin IDs that were used for the most
+   * recent WebSocket connection.  When this key changes we close the old
+   * socket and open a new one so the subscription always covers the current
+   * coin set (e.g. after the 30-second REST refresh adds new coins).
+   */
+  const coinIdsKeyRef = useRef<string>('');
+
   const clearReconnectTimer = useCallback(() => {
     if (reconnectTimerRef.current !== null) {
       clearTimeout(reconnectTimerRef.current);
@@ -131,12 +139,26 @@ export function useRealtimePrice(coinIds: string[]): RealtimePriceResult {
     }
   }, []); // stable – reads coinIds via ref
 
-  // Connect once coinIds are available
+  // Connect (or reconnect) whenever the set of coin IDs changes.
+  // We compare a sorted key so that order differences don't cause spurious
+  // reconnects (e.g. the REST list returning the same coins in a different
+  // order after a 30-second refresh).
   useEffect(() => {
-    if (coinIds.length > 0 && wsRef.current === null) {
-      connect();
+    if (coinIds.length === 0) return;
+    const newKey = [...coinIds].sort().join(',');
+    if (newKey === coinIdsKeyRef.current) return;
+    coinIdsKeyRef.current = newKey;
+
+    // Close the existing socket before reconnecting with the updated coin set.
+    if (wsRef.current) {
+      wsRef.current.onclose = null; // suppress the reconnect triggered by close
+      wsRef.current.close();
+      wsRef.current = null;
     }
-  }, [coinIds, connect]);
+    clearReconnectTimer();
+    reconnectAttemptsRef.current = 0;
+    connect();
+  }, [coinIds, connect, clearReconnectTimer]);
 
   // Cleanup on unmount
   useEffect(() => {

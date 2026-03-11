@@ -50,7 +50,15 @@ A production-ready, comprehensive cryptocurrency price tracking dashboard with r
 - ✅ Screen reader accessibility
 - ✅ WCAG AA compliant color contrast
 
-### 6. Deployment Ready ✅
+### 6. Live Price Pipeline ✅ (updated)
+- ✅ WebSocket reconnects when coin set changes (e.g. after 30-second REST refresh)
+- ✅ Charts receive live prices via `livePrice` prop — imperative Chart.js update
+- ✅ Chart updates throttled to ≤1 Hz — smooth, no jarring React re-renders
+- ✅ Zustand `rtPrices` selector pattern — only the affected `LivePrice` row re-renders
+- ✅ Architecture documented in [ARCHITECTURE.md](./ARCHITECTURE.md)
+- ✅ Tests added for every layer of the live price pipeline
+
+### 7. Deployment Ready ✅
 - ✅ Complete package.json with dependencies
 - ✅ Build scripts for production
 - ✅ Environment variable configuration

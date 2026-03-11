@@ -49,7 +49,21 @@ interface CryptoState {
   setPriceAlert: (coinId: string, threshold: number) => void;
   removePriceAlert: (coinId: string) => void;
 
-  // Real-time prices (WebSocket)
+  /**
+   * Real-time prices streamed from the CoinCap WebSocket
+   * (coinId → latest USD price).
+   *
+   * **Why these live in Zustand instead of React state / Context:**
+   * `LivePrice` components are rendered inside every table row (up to 100 rows)
+   * and in the chart header — far too deep to prop-drill prices from
+   * `CryptoDashboard`.  Storing them here lets each `LivePrice` subscribe with
+   * a per-coin selector (`state => state.rtPrices[coinId]`), so only the
+   * component for the coin whose price changed re-renders, rather than the
+   * entire table.
+   *
+   * `wsConnected` is exposed so the `FreshnessIndicator` can show a live /
+   * stale badge anywhere in the tree without extra prop threading.
+   */
   rtPrices: Record<string, number>;
   wsConnected: boolean;
   setRtPrices: (prices: Record<string, number>) => void;
